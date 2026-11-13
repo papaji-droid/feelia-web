@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Feelia – Phòng thử đồ 3D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600&family=Bricolage+Grotesque:wght@600;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f5f2f9;--surface:#fff;--ink:#1f1729;--muted:#6f6580;--accent:#6c3ce0;--accent-ink:#fff;--soft:#e9e0fb;--bad:#d6293e;--ok:#1d8a5b;--line:#e3dcef;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#150f1d;--surface:#201829;--ink:#f3eefb;--muted:#b0a5c2;--accent:#a98bff;--accent-ink:#150f1d;--soft:#2e2342;--bad:#ff6b7d;--ok:#5fd39b;--line:#352a47}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#150f1d;--surface:#201829;--ink:#f3eefb;--muted:#b0a5c2;--accent:#a98bff;--accent-ink:#150f1d;--soft:#2e2342;--bad:#ff6b7d;--ok:#5fd39b;--line:#352a47}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.55 "Be Vietnam Pro",system-ui,-apple-system,"Segoe UI",sans-serif}
+h1,h2{font-family:"Bricolage Grotesque","Be Vietnam Pro",system-ui,sans-serif;margin:0;letter-spacing:-.02em}
+button,input{font:inherit;color:inherit}button{cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1040px;margin:0 auto;padding:0 16px}
+.top{display:flex;align-items:baseline;gap:12px;padding:16px 0 4px}
+.top b{font-family:"Bricolage Grotesque",sans-serif;font-size:26px;font-weight:800;color:var(--accent)}
+.top span{color:var(--muted)}
+.app{display:grid;gap:20px;padding:12px 0 40px}
+@media (min-width:820px){.app{grid-template-columns:minmax(300px,420px) 1fr;align-items:start}}
+.stage{width:min(100%,calc(68vh * .75));aspect-ratio:3/4;margin:0 auto;border-radius:20px;background:linear-gradient(180deg,var(--soft),var(--surface));border:1px solid var(--line);overflow:hidden;position:relative}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:pan-y;cursor:grab}
+.hint{position:absolute;left:0;right:0;bottom:8px;text-align:center;font-size:12px;color:var(--muted);pointer-events:none}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;display:grid;gap:14px}
+h2{font-size:20px;font-weight:800}
+.sl label{display:flex;justify-content:space-between;font-size:14px;font-weight:500}
+.sl output{color:var(--accent);font-weight:600}
+input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
+.chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.chip{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:7px 14px;font-size:14px}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.sw{width:30px;height:30px;border-radius:50%;border:2px solid var(--line);padding:0}
+.sw[aria-pressed="true"]{border-color:var(--ink);box-shadow:0 0 0 2px var(--surface) inset}
+.lab{font-size:13px;color:var(--muted);margin-bottom:6px}
+.shape{background:var(--soft);border-radius:12px;padding:12px 14px}
+.shape strong{font-size:17px}
+.shape p{margin:4px 0 0;font-size:14px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:7px 4px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:500}
+.bad{color:var(--bad);font-weight:600}.good{color:var(--ok);font-weight:600}
+.note{font-size:13px;color:var(--muted);margin:0}
+.rec{font-size:15px}
+.rec b{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="top"><b>Feelia</b><span>Phòng thử đồ 3D</span></div>
+<div class="app">
+<div>
+<div class="stage" id="stage"><canvas id="cv" aria-label="Mô hình 3D, kéo ngang để xoay"></canvas><div class="hint">Kéo ngang để xoay mô hình</div></div>
+<div class="chips" style="justify-content:center;margin-top:12px" id="views"><button class="chip" data-r="0" aria-pressed="true">Trước</button><button class="chip" data-r="1.5708" aria-pressed="false">Bên</button><button class="chip" data-r="3.1416" aria-pressed="false">Sau</button></div>
+</div>
+<div class="panel">
+<h2>Số đo của bạn</h2>
+<div id="sliders"></div>
+<div><div class="lab">Dáng mô hình</div><div class="chips" id="pose"></div></div>
+<div><div class="lab">Chất liệu mô hình</div><div class="chips" id="fin"></div></div>
+<div><div class="lab">Chọn kiểu đồ</div><div class="chips" id="gar"></div></div>
+<div><div class="lab">Màu sắc</div><div class="chips" id="col"></div></div>
+<div><div class="lab">Size</div><div class="chips" id="sizes"></div></div>
+<div class="shape" id="shape"></div>
+<div class="rec" id="rec"></div>
+<table><thead><tr><th>Vòng</th><th>Bạn</th><th>Áo/váy</th><th>Độ vừa</th></tr></thead><tbody id="fit"></tbody></table>
+<p class="note">Mô hình được dựng xấp xỉ từ số đo, để hình dung form và chọn size, không phải bản sao chính xác 100%. Số đo chỉ xử lý trên máy bạn, không được gửi đi.</p>
+</div>
+</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ===== CẤU HÌNH: sửa bảng size theo nhà cung cấp của Feelia (cm: ngực, eo, mông của sản phẩm) ===== */
+const CHART={S:[88,70,94],M:[92,74,98],L:[96,78,102],XL:[100,82,106]};
+const COLORS=["#8a5cf0","#e8688a","#2f9d8a","#e0a84a","#2b2438"];
+/* POSES: A = tay [nâng trước, dang ngang, gập khuỷu trước, gập khuỷu vào trong]; L = chân [bước trước, dang ngang, gập gối]. Đơn vị radian. Thêm dáng mới bằng cách thêm 1 dòng. */
+const POSES={
+ stand:{n:"Đứng thẳng",A:[[0,.12,.1,0],[0,.12,.1,0]],L:[[0,.04,0],[0,.04,0]]},
+ hip:{n:"Chống hông",A:[[0,.75,0,1.9],[0,.75,0,1.9]],L:[[.05,.08,0],[-.03,.05,.05]]},
+ reach:{n:"Tay đưa ra",A:[[.3,.95,.5,0],[.05,.55,.4,.2]],L:[[.12,.05,0],[-.08,.04,.1]]},
+ walk:{n:"Catwalk",A:[[-.25,.2,.25,0],[0,.75,0,1.9]],L:[[.35,.03,0],[-.22,.03,.18]]},
+ sit:{n:"Ngồi",sit:1,A:[[.5,.2,.7,0],[-.3,.3,.2,0]],L:[[1.5,0,1.5],[1.58,-.4,1.3]]},
+ torso:{n:"Thân hình nộm"}
+};
+/* FINISHES: màu và độ bóng của hình nộm (c = mã màu, r = độ nhám 0 bóng đến 1 mờ) */
+const FINISHES={gloss:{n:"Trắng bóng",c:0xf2f0f4,r:.25,m:.05},cream:{n:"Kem",c:0xe8dfcf,r:.55},gray:{n:"Xám mờ",c:0x6b6b72,r:.85},black:{n:"Đen mờ",c:0x25232a,r:.8}};
+const GARMENTS=[["midi","Váy midi"],["mini","Váy ngắn"],["set","Áo + quần"]];
+const FIELDS=[["h","Chiều cao",140,185,160],["b","Vòng ngực",74,120,88],["w","Vòng eo",56,110,70],["p","Vòng mông",80,125,94]];
+const SHAPES={
+ hourglass:["Đồng hồ cát","Ngực và mông cân đối, eo thon. Hợp váy ôm eo, váy wrap, chân váy bút chì."],
+ pear:["Quả lê","Hông rộng hơn ngực. Hợp áo có điểm nhấn ở cổ và vai, váy chữ A, quần ống suông lưng cao."],
+ invtri:["Tam giác ngược","Ngực lớn hơn hông. Hợp chân váy xòe, quần ống rộng để cân đối phần dưới."],
+ rect:["Chữ nhật","Ngực, eo, mông gần bằng nhau. Hợp váy xếp ly, áo peplum, thắt eo để tạo đường cong."],
+ apple:["Quả táo","Eo là vòng lớn nhất so với ngực và mông. Hợp áo suông cổ chữ V, váy cắt dưới ngực."]
+};
+/* ===== HẾT CẤU HÌNH ===== */
+const $=s=>document.querySelector(s),ORDER=["S","M","L","XL"];
+const v={},st={garment:"midi",size:"auto",color:COLORS[0],pose:"stand",finish:"gloss"};
+$("#sliders").innerHTML=FIELDS.map(f=>{v[f[0]]=f[4];return `<div class="sl"><label for="r_${f[0]}">${f[1]}<output id="o_${f[0]}">${f[4]} cm</output></label><input type="range" id="r_${f[0]}" min="${f[2]}" max="${f[3]}" value="${f[4]}"></div>`}).join("");
+$("#gar").innerHTML=GARMENTS.map(g=>`<button class="chip" data-g="${g[0]}" aria-pressed="${g[0]===st.garment}">${g[1]}</button>`).join("");
+$("#pose").innerHTML=Object.keys(POSES).map(k=>`<button class="chip" data-p="${k}" aria-pressed="${k===st.pose}">${POSES[k].n}</button>`).join("");
+$("#fin").innerHTML=Object.keys(FINISHES).map(k=>`<button class="chip" data-f="${k}" aria-pressed="${k===st.finish}">${FINISHES[k].n}</button>`).join("");
+$("#col").innerHTML=COLORS.map(c=>`<button class="chip sw" data-c="${c}" style="background:${c}" aria-label="Màu ${c}" aria-pressed="${c===st.color}"></button>`).join("");
+$("#sizes").innerHTML=["auto",...ORDER].map(s=>`<button class="chip" data-s="${s}" aria-pressed="${s===st.size}">${s==="auto"?"Gợi ý cho tôi":s}</button>`).join("");
+
+let renderer,scene,camera,grp;
+try{
+ renderer=new THREE.WebGLRenderer({canvas:$("#cv"),antialias:true,alpha:true});
+ renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
+ scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(30,.75,.1,50);
+ scene.add(new THREE.HemisphereLight(0xffffff,0x8878a0,.95));
+ const dl=new THREE.DirectionalLight(0xffffff,.8);dl.position.set(2,3,4);scene.add(dl);
+ grp=new THREE.Group();scene.add(grp);
+}catch(e){$("#stage").innerHTML='<p style="padding:24px">Thiết bị chưa hỗ trợ hiển thị 3D. Bạn vẫn xem được gợi ý size bên cạnh.</p>';renderer=null}
+const draw=()=>renderer&&renderer.render(scene,camera);
+function fit(){if(!renderer)return;const s=$("#stage");renderer.setSize(s.clientWidth,s.clientHeight,false);draw()}
+new ResizeObserver(fit).observe($("#stage"));
+
+function classify(b,w,p){
+ const d=(b-p)/((b+p)/2),wr=w/Math.max(b,p);
+ if(wr>=.85)return"apple";if(d>=.05)return"invtri";if(d<=-.05)return"pear";return wr<=.75?"hourglass":"rect";
+}
+function pick(){
+ const m=[v.b,v.w,v.p],ok=s=>CHART[s].every((g,i)=>g-m[i]>=2);
+ const rec=ORDER.find(ok);return{rec:rec||"XL",none:!rec,use:st.size==="auto"?(rec||"XL"):st.size,m};
+}
+function build(){
+ if(!renderer)return;
+ const ry=grp.rotation.y;
+ while(grp.children.length){const o=grp.children[0];grp.remove(o);o.traverse(n=>{n.geometry&&n.geometry.dispose();n.material&&n.material.dispose&&n.material.dispose()})}
+ const H=v.h/100,k=1.38,y=f=>f*H,P=POSES[st.pose],F=FINISHES[st.finish],tor=st.pose==="torso",drop=P.sit?y(.24):0;
+ const R=c=>c/100/(2*Math.PI)*Math.sqrt(2/(k*k+1))*k;
+ const skin=new THREE.MeshStandardMaterial({color:F.c,roughness:F.r,metalness:F.m||0});
+ const cloth=c=>new THREE.MeshStandardMaterial({color:c,roughness:.6,side:THREE.DoubleSide});
+ const dark=new THREE.MeshStandardMaterial({color:0x2a2630,roughness:.9});
+ const body=new THREE.Group();body.position.y=-drop;grp.add(body);
+ const lathe=(pts,mat)=>{const sp=new THREE.SplineCurve(pts.map(a=>new THREE.Vector2(Math.max(a[0],.001),a[1])));const m=new THREE.Mesh(new THREE.LatheGeometry(sp.getPoints(70),56),mat);m.scale.z=1/k;body.add(m)};
+ const ball=(r,mat,par,yy,z,sx,sy,sz)=>{const m=new THREE.Mesh(new THREE.SphereGeometry(r,18,14),mat);m.position.set(0,yy||0,z||0);m.scale.set(sx||1,sy||1,sz||1);par.add(m)};
+ const seg=(par,len,r1,r2,mat)=>{const m=new THREE.Mesh(new THREE.CylinderGeometry(r1,r2,len,20),mat);m.position.y=-len/2;par.add(m)};
+ const limb=(pos,a,b,l1,l2,ra,rb,rc,s,leg,ov)=>{
+  const g=new THREE.Group();g.position.set(pos[0],pos[1],0);g.rotation.z=s*a[1];g.rotation.x=-a[0];body.add(g);
+  seg(g,l1,ra,rb,skin);ball(ra,skin,g);
+  const e=new THREE.Group();e.position.y=-l1;e.rotation.x=leg?b[0]:-b[0];e.rotation.z=-s*(b[1]||0);g.add(e);
+  seg(e,l2,rb,rc,skin);ball(rb,skin,e);
+  if(leg){ball(H*.025,skin,e,-l2,H*.03,.7,.6,2);if(ov){seg(g,l1*.98,ra*1.15,rb*1.25,ov);seg(e,l2*.92,rb*1.25,rc*2.4,ov)}}
+  else{ball(H*.016,skin,e,-l2,0,.8,1.5,.5);if(ov)seg(g,l1*.5,ra*1.22,ra*1.16,ov)}
+ };
+ const hR=R(v.p),wR=R(v.w),bR=R(v.b),sh=H*.118,shx=Math.max(sh,bR*.86);
+ lathe([[.001,y(.462)],[hR*.6,y(.466)],[hR*.93,y(.485)],[hR,y(.525)],[(hR+wR)/2,y(.575)],[wR,y(.625)],[(wR+bR)/2,y(.675)],[bR,y(.72)],[bR*.92,y(.77)],[shx,y(.815)],[sh*.5,y(.845)],[H*.027,y(.86)],[H*.027,y(.9)]],skin);
+ if(tor){ball(H*.027,skin,body,y(.9));const pl=new THREE.Mesh(new THREE.CylinderGeometry(.012,.012,y(.462),12),skin);pl.position.y=y(.231);body.add(pl)}
+ else ball(H*.058,skin,body,y(.945),0,1,1.2,1.05);
+ if(P.sit){const bx=new THREE.Mesh(new THREE.BoxGeometry(.6,y(.175),.45),dark);bx.position.set(0,y(.175)/2,-.05);grp.add(bx)}
+ else{const pd=new THREE.Mesh(new THREE.CylinderGeometry(.38,.38,.012,40),dark);pd.position.y=-.006;grp.add(pd)}
+ const p=pick(),G=CHART[p.use],set=st.garment==="set",cl=cloth(st.color),pm=cloth(0x2c2438);
+ const gb=Math.max(R(G[0]),bR*1.012),gw=Math.max(R(G[1]),wR*1.012),gh=Math.max(R(G[2]),hR*1.012);
+ if(!tor)[-1,1].forEach((s,i)=>{const A=P.A[i],Lg=P.L[i];
+  limb([s*(shx-H*.012),y(.805)],A.slice(0,2),A.slice(2),y(.16),y(.145),H*.027,H*.021,H*.014,s,0,set?cl:null);
+  limb([s*hR*.46,y(.47)],[Lg[0],Lg[1]],[Lg[2]],y(.24),y(.225),hR*.52,H*.034,H*.02,s,1,set?pm:null)});
+ const top=[[gb*.9,y(.805)],[gb,y(.72)],[(gb+gw)/2,y(.675)]];
+ if(set){
+  lathe([...top,[gw*1.03,y(.62)],[gw*1.05,y(.585)]],cl);
+  if(!tor)lathe([[gw*1.02,y(.64)],[gh,y(.525)],[gh*.96,y(.47)]],pm);
+ }else{
+  const hem=st.garment==="midi"?.30:.40,fl=st.garment==="midi"?1.55:1.3;
+  lathe([...top,[gw,y(.625)],[(gw+gh)/2,y(.575)],[gh,y(.525)],[gh*1.08,y(.46)],[gh*(1+(fl-1)*.75),y((.46+hem)/2)],[gh*fl,y(hem)]],cl);
+ }
+ camera.position.set(0,y(.52)-drop*.5,H*2.6);camera.lookAt(0,y(.5)-drop*.5,0);
+ grp.rotation.y=ry;draw();
+}
+function ui(){
+ const p=pick(),G=CHART[p.use],sp=SHAPES[classify(v.b,v.w,v.p)];
+ $("#shape").innerHTML=`<strong>Dáng ${sp[0]}</strong><p>${sp[1]}</p>`;
+ $("#rec").innerHTML=p.none?`Số đo của bạn vượt bảng size hiện có. Hãy nhắn Zalo để shop tư vấn chọn hoặc may riêng.`:`Size gợi ý: <b>${p.rec}</b>${st.size!=="auto"&&st.size!==p.rec?`. Bạn đang xem thử size ${st.size}.`:"."}`;
+ const L=["Ngực","Eo","Mông"];
+ $("#fit").innerHTML=L.map((n,i)=>{const d=G[i]-p.m[i],t=d<0?["Chật","bad"]:d<3?["Ôm","good"]:d<=10?["Vừa","good"]:["Rộng",""];return `<tr><td>${n}</td><td>${p.m[i]} cm</td><td>${G[i]} cm</td><td class="${t[1]}">${t[0]}</td></tr>`}).join("");
+}
+function update(){ui();build()}
+FIELDS.forEach(f=>$("#r_"+f[0]).addEventListener("input",e=>{v[f[0]]=+e.target.value;$("#o_"+f[0]).textContent=e.target.value+" cm";update()}));
+const group=(sel,key,attr)=>$(sel).addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;st[key]=b.dataset[attr];$(sel).querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x===b));update()});
+group("#gar","garment","g");group("#pose","pose","p");group("#fin","finish","f");group("#col","color","c");group("#sizes","size","s");
+$("#views").addEventListener("click",e=>{const b=e.target.closest("button");if(!b||!renderer)return;grp.rotation.y=+b.dataset.r;$("#views").querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x===b));draw()});
+let dx=null;const cv=$("#cv");
+cv.addEventListener("pointerdown",e=>{dx=e.clientX;cv.setPointerCapture(e.pointerId)});
+cv.addEventListener("pointermove",e=>{if(dx===null||!renderer)return;grp.rotation.y+=(e.clientX-dx)*.01;dx=e.clientX;draw()});
+["pointerup","pointercancel"].forEach(t=>cv.addEventListener(t,()=>dx=null));
+update();fit();
+</script>
+</body>
+</html>

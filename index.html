@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Feelia – Thời trang nữ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600&family=Bricolage+Grotesque:wght@600;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f5f2f9;--surface:#fff;--ink:#1f1729;--muted:#6f6580;--accent:#6c3ce0;--accent-ink:#fff;--soft:#e9e0fb;--sale:#d6293e;--line:#e3dcef;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#150f1d;--surface:#201829;--ink:#f3eefb;--muted:#b0a5c2;--accent:#a98bff;--accent-ink:#150f1d;--soft:#2e2342;--sale:#ff6b7d;--line:#352a47}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#150f1d;--surface:#201829;--ink:#f3eefb;--muted:#b0a5c2;--accent:#a98bff;--accent-ink:#150f1d;--soft:#2e2342;--sale:#ff6b7d;--line:#352a47}
+html{scroll-padding-top:calc(70px + env(safe-area-inset-top,0px));scroll-behavior:smooth}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.55 "Be Vietnam Pro",system-ui,-apple-system,"Segoe UI",sans-serif}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:40;background:var(--surface)}
+h1,h2,.logo{font-family:"Bricolage Grotesque","Be Vietnam Pro",system-ui,sans-serif;margin:0;letter-spacing:-.02em}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1120px;margin:0 auto;padding:0 16px}
+.bar{background:var(--ink);color:var(--bg);text-align:center;font-size:13px;padding:8px 12px}
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;background:var(--surface);border-bottom:1px solid var(--line)}
+.hrow{display:flex;align-items:center;gap:12px;padding:10px 16px;max-width:1120px;margin:0 auto}
+.logo{font-size:26px;font-weight:800;color:var(--accent);text-decoration:none}
+.search{flex:1;min-width:0;border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:9px 16px}
+.cartbtn{position:relative;border:0;background:var(--accent);color:var(--accent-ink);border-radius:999px;padding:9px 16px;font-weight:600;white-space:nowrap}
+.cartbtn b{display:inline-block;min-width:20px;margin-left:6px;background:var(--accent-ink);color:var(--accent);border-radius:99px;font-size:12px;line-height:20px;text-align:center}
+.hero{padding:44px 0 28px}
+.hero .wrap{display:grid;gap:28px;align-items:center}
+.hero h1{font-size:clamp(44px,11vw,104px);line-height:.95;font-weight:800;max-width:11ch}
+.hero p{color:var(--muted);max-width:46ch;margin:16px 0 22px}
+.btn{display:inline-block;border:0;border-radius:999px;background:var(--accent);color:var(--accent-ink);padding:13px 26px;font-weight:600;text-decoration:none}
+.btn.alt{background:transparent;color:var(--ink);border:1.5px solid var(--ink)}
+.blocks{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.blocks i{display:block;aspect-ratio:3/4;border-radius:120px 120px 14px 14px}
+.blocks i:nth-child(2){margin-top:28px;border-radius:14px 14px 120px 120px}
+.trust{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:8px 0 36px}
+.trust div{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px;font-size:14px}
+.trust strong{display:block}
+h2{font-size:clamp(28px,5vw,40px);font-weight:800}
+.tools{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin:14px 0 18px}
+.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 16px;white-space:nowrap}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+select{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden;display:flex;flex-direction:column}
+.tile{position:relative;aspect-ratio:3/4;display:grid;place-items:center;color:rgba(255,255,255,.85)}
+.tile svg{width:38%;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.tile img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.tag{position:absolute;top:10px;left:10px;background:var(--surface);color:var(--ink);font-size:12px;font-weight:600;border-radius:99px;padding:2px 10px}
+.tag.sale{background:var(--sale);color:#fff}
+.info{padding:12px;display:flex;flex-direction:column;gap:8px;flex:1}
+.name{font-weight:500;font-size:15px;line-height:1.35}
+.price b{font-size:17px}
+.price s{color:var(--muted);font-size:13px;margin-left:6px}
+.sizes{display:flex;gap:6px;flex-wrap:wrap}
+.sz{min-width:36px;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:5px 8px;font-size:13px}
+.sz[aria-pressed="true"]{border-color:var(--accent);background:var(--soft);font-weight:600}
+.add{margin-top:auto;border:1.5px solid var(--ink);background:transparent;border-radius:10px;padding:9px;font-weight:600}
+.add:hover{background:var(--ink);color:var(--bg)}
+.muted{color:var(--muted)}
+.about{margin:56px 0 0;background:var(--soft);padding:40px 0}
+.about p{max-width:60ch;margin:12px 0 0}
+footer{padding:32px 0 96px;color:var(--muted);font-size:14px}
+footer a{color:var(--ink)}
+.chat{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:25;background:var(--ink);color:var(--bg);border-radius:999px;padding:12px 20px;text-decoration:none;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+.veil{position:fixed;inset:0;background:rgba(15,8,25,.5);z-index:50;opacity:0;pointer-events:none;transition:opacity .2s}
+.veil.on{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(440px,100%);background:var(--surface);z-index:60;transform:translateX(102%);transition:transform .25s;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px)}
+.drawer.on{transform:none}
+.dh{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line)}
+.dh h2{font-size:22px}
+.x{border:0;background:transparent;font-size:26px;line-height:1;padding:4px 8px}
+.db{flex:1;overflow-y:auto;padding:12px 16px}
+.item{display:grid;grid-template-columns:56px 1fr auto;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.item .th{width:56px;height:72px;border-radius:10px}
+.qty{display:inline-flex;align-items:center;gap:8px;margin-top:4px}
+.qty button{width:28px;height:28px;border-radius:8px;border:1px solid var(--line);background:var(--bg)}
+.df{padding:12px 16px calc(14px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line);display:grid;gap:8px}
+.row{display:flex;justify-content:space-between}
+.row.t{font-weight:600;font-size:18px}
+.meter{height:6px;background:var(--soft);border-radius:9px;overflow:hidden}
+.meter i{display:block;height:100%;background:var(--accent);width:0;transition:width .25s}
+.f{display:grid;gap:8px;margin-top:12px}
+.f input,.f textarea{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:10px 12px}
+.out{width:100%;min-height:150px;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:10px;font-size:14px}
+.toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:99px;z-index:70;opacity:0;transition:.25s;pointer-events:none;font-size:14px;max-width:90%}
+.toast.on{opacity:1;transform:translateX(-50%)}
+@media (min-width:760px){.hero .wrap{grid-template-columns:1.3fr 1fr}.trust{grid-template-columns:repeat(4,1fr)}.grid{grid-template-columns:repeat(4,1fr)}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<div class="bar" id="bar"></div>
+<header><div class="hrow">
+<a class="logo" href="#top" id="logo">Feelia</a>
+<input class="search" id="q" type="search" placeholder="Tìm váy, áo, quần..." aria-label="Tìm sản phẩm">
+<button class="cartbtn" id="openCart" aria-label="Mở giỏ hàng">Giỏ hàng<b id="cnt">0</b></button>
+</div></header>
+
+<main id="top">
+<section class="hero"><div class="wrap">
+<div>
+<h1>Mặc đẹp, mỗi ngày.</h1>
+<p>Váy, áo và set đồ nữ dễ phối, form chuẩn, giá rõ ràng. Chọn size, thêm vào giỏ và chốt đơn trong vài chạm.</p>
+<a class="btn" href="#shop">Xem sản phẩm</a>
+</div>
+<div class="blocks" aria-hidden="true"><i style="background:#c9b3f5"></i><i style="background:#f2a9b8"></i><i style="background:#9fd3c7"></i></div>
+</div></section>
+
+<div class="wrap">
+<div class="trust" id="trust"></div>
+<section id="shop">
+<h2>Sản phẩm mới</h2>
+<div class="tools">
+<div class="chips" id="chips" role="group" aria-label="Danh mục"></div>
+<select id="sort" aria-label="Sắp xếp"><option value="">Mặc định</option><option value="asc">Giá thấp đến cao</option><option value="desc">Giá cao đến thấp</option></select>
+</div>
+<div class="grid" id="grid"></div>
+</section>
+</div>
+
+<section class="about"><div class="wrap">
+<h2>Về Feelia</h2>
+<p id="about"></p>
+</div></section>
+</main>
+
+<footer><div class="wrap" id="foot"></div></footer>
+<a class="chat" id="chat" href="#" target="_blank" rel="noopener">Chat Zalo</a>
+
+<div class="veil" id="veil"></div>
+<aside class="drawer" id="drawer" aria-label="Giỏ hàng">
+<div class="dh"><h2>Giỏ hàng</h2><button class="x" id="closeCart" aria-label="Đóng">×</button></div>
+<div class="db" id="cartBody"></div>
+<div class="df" id="cartFoot"></div>
+</aside>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+/* ===== CẤU HÌNH: sửa phần này để đổi nội dung shop ===== */
+const SHOP={
+  name:"Feelia",
+  phone:"0900 000 000",
+  zalo:"https://zalo.me/0900000000",
+  email:"hello@feelia.vn",
+  announcement:"Freeship đơn từ 499.000₫. Đổi size miễn phí trong 7 ngày.",
+  freeShip:499000, shipFee:30000,
+  about:"Feelia là shop thời trang nữ bán online. Chúng tôi chọn những mẫu dễ mặc, dễ phối và mô tả size rõ ràng để bạn yên tâm đặt hàng.",
+  trust:[["Freeship","Đơn từ 499.000₫"],["Đổi trả 7 ngày","Đổi size dễ dàng"],["Thanh toán COD","Nhận hàng rồi trả tiền"],["Tư vấn size","Chat Zalo mỗi ngày"]]
+};
+const CATS=["Tất cả","Váy","Áo","Quần","Set"];
+/* img: để trống thì hiện ô màu. Muốn dùng ảnh thật, gửi ảnh cho người hỗ trợ để nhúng vào. */
+const PRODUCTS=[
+ {id:1,name:"Váy hoa nhí cổ vuông",cat:"Váy",price:459000,old:590000,sizes:["S","M","L"],color:"#e8a3b5",tag:"Sale",img:""},
+ {id:2,name:"Váy midi xếp ly",cat:"Váy",price:529000,sizes:["S","M","L","XL"],color:"#b79df0",tag:"Mới",img:""},
+ {id:3,name:"Áo sơ mi lụa cổ nơ",cat:"Áo",price:329000,sizes:["S","M","L"],color:"#f4e3d0",tag:"Mới",img:""},
+ {id:4,name:"Áo croptop tay phồng",cat:"Áo",price:219000,old:269000,sizes:["S","M"],color:"#8fcab9",tag:"Sale",img:""},
+ {id:5,name:"Quần ống rộng lưng cao",cat:"Quần",price:389000,sizes:["S","M","L","XL"],color:"#6d6a8f",tag:"",img:""},
+ {id:6,name:"Quần short linen",cat:"Quần",price:259000,sizes:["S","M","L"],color:"#d9c3a0",tag:"",img:""},
+ {id:7,name:"Set áo blazer + chân váy",cat:"Set",price:799000,old:990000,sizes:["S","M","L"],color:"#4e3b78",tag:"Sale",img:""},
+ {id:8,name:"Set đồ ngủ lụa satin",cat:"Set",price:449000,sizes:["M","L","XL"],color:"#f0b8a0",tag:"Mới",img:""}
+];
+/* ===== HẾT PHẦN CẤU HÌNH ===== */
+
+const $=s=>document.querySelector(s);
+const money=n=>n.toLocaleString("vi-VN")+"₫";
+const byId=id=>PRODUCTS.find(p=>p.id===id);
+let cat="Tất cả",q="",sort="",cart=[],sel={};
+try{cart=JSON.parse(localStorage.getItem("feelia_cart")||"[]").filter(i=>byId(i.id))}catch(e){cart=[]}
+const save=()=>{try{localStorage.setItem("feelia_cart",JSON.stringify(cart))}catch(e){}};
+let tt;function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("on");clearTimeout(tt);tt=setTimeout(()=>t.classList.remove("on"),2200)}
+const icon='<svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 14a5 5 0 1 1 5 5c-2 1-5 2-5 5v3L6 46a3 3 0 0 0 2 5h48a3 3 0 0 0 2-5L32 27"/></svg>';
+const tileBg=c=>`background:linear-gradient(160deg,${c},color-mix(in srgb,${c} 60%,#000))`;
+
+function init(){
+  document.title=SHOP.name+" – Thời trang nữ";
+  $("#logo").textContent=SHOP.name;$("#bar").textContent=SHOP.announcement;
+  $("#about").textContent=SHOP.about;$("#chat").href=SHOP.zalo;
+  $("#trust").innerHTML=SHOP.trust.map(t=>`<div><strong>${t[0]}</strong><span class="muted">${t[1]}</span></div>`).join("");
+  $("#foot").innerHTML=`<p><strong>${SHOP.name}</strong><br>Hotline: <a href="tel:${SHOP.phone.replace(/\s/g,"")}">${SHOP.phone}</a><br>Email: <a href="mailto:${SHOP.email}">${SHOP.email}</a></p><p>© ${new Date().getFullYear()} ${SHOP.name}. Giá đã gồm VAT.</p>`;
+  $("#chips").innerHTML=CATS.map(c=>`<button class="chip" data-c="${c}" aria-pressed="${c===cat}">${c}</button>`).join("");
+  render();drawCart();
+}
+function card(p){
+  const off=p.old?Math.round((1-p.price/p.old)*100):0;
+  const tag=p.tag?`<span class="tag ${p.tag==="Sale"?"sale":""}">${p.tag==="Sale"?"-"+off+"%":p.tag}</span>`:"";
+  return `<article class="card" data-id="${p.id}"><div class="tile" style="${tileBg(p.color)}">${p.img?`<img src="${p.img}" alt="${p.name}">`:icon}${tag}</div>
+  <div class="info"><div class="name">${p.name}</div><div class="price"><b>${money(p.price)}</b>${p.old?`<s>${money(p.old)}</s>`:""}</div>
+  <div class="sizes" role="group" aria-label="Chọn size">${p.sizes.map(s=>`<button class="sz" data-s="${s}" aria-pressed="${sel[p.id]===s}">${s}</button>`).join("")}</div>
+  <button class="add">Thêm vào giỏ</button></div></article>`;
+}
+function render(){
+  let l=PRODUCTS.filter(p=>(cat==="Tất cả"||p.cat===cat)&&p.name.toLowerCase().includes(q));
+  if(sort==="asc")l.sort((a,b)=>a.price-b.price);if(sort==="desc")l.sort((a,b)=>b.price-a.price);
+  $("#grid").innerHTML=l.length?l.map(card).join(""):'<p class="muted">Không tìm thấy sản phẩm. Thử từ khóa khác hoặc chọn “Tất cả”.</p>';
+}
+$("#chips").onclick=e=>{const b=e.target.closest(".chip");if(!b)return;cat=b.dataset.c;document.querySelectorAll(".chip").forEach(c=>c.setAttribute("aria-pressed",c===b));render()};
+$("#q").oninput=e=>{q=e.target.value.trim().toLowerCase();render()};
+$("#sort").onchange=e=>{sort=e.target.value;render()};
+$("#grid").onclick=e=>{
+  const c=e.target.closest(".card");if(!c)return;const id=+c.dataset.id;
+  const z=e.target.closest(".sz");
+  if(z){sel[id]=z.dataset.s;c.querySelectorAll(".sz").forEach(b=>b.setAttribute("aria-pressed",b===z));return}
+  if(e.target.closest(".add")){
+    if(!sel[id]){toast("Vui lòng chọn size trước");return}
+    const f=cart.find(i=>i.id===id&&i.size===sel[id]);f?f.qty++:cart.push({id,size:sel[id],qty:1});
+    save();drawCart();toast("Đã thêm vào giỏ hàng");
+  }
+};
+function totals(){const sub=cart.reduce((s,i)=>s+byId(i.id).price*i.qty,0);return{sub,ship:sub===0||sub>=SHOP.freeShip?0:SHOP.shipFee}}
+function drawCart(){
+  const n=cart.reduce((s,i)=>s+i.qty,0);$("#cnt").textContent=n;
+  const {sub,ship}=totals();
+  $("#cartBody").innerHTML=cart.length?cart.map((i,k)=>{const p=byId(i.id);return `<div class="item"><div class="th" style="${tileBg(p.color)}"></div><div><div class="name">${p.name}</div><div class="muted">Size ${i.size} · ${money(p.price)}</div><div class="qty"><button data-k="${k}" data-d="-1" aria-label="Giảm">−</button><span>${i.qty}</span><button data-k="${k}" data-d="1" aria-label="Tăng">+</button></div></div><button class="x" data-k="${k}" data-d="x" aria-label="Xóa">×</button></div>`}).join(""):'<p class="muted">Giỏ hàng đang trống. Chọn sản phẩm bạn thích để bắt đầu.</p>';
+  const need=Math.max(0,SHOP.freeShip-sub),pct=Math.min(100,sub/SHOP.freeShip*100);
+  $("#cartFoot").innerHTML=cart.length?`<div class="meter"><i style="width:${pct}%"></i></div><div class="muted" style="font-size:14px">${need?`Mua thêm ${money(need)} để được freeship`:"Bạn được freeship"}</div>
+  <div class="row"><span>Tạm tính</span><span>${money(sub)}</span></div><div class="row"><span>Phí giao hàng</span><span>${ship?money(ship):"Miễn phí"}</span></div><div class="row t"><span>Tổng cộng</span><span>${money(sub+ship)}</span></div>
+  <button class="btn" id="go">Đặt hàng</button>`:"";
+}
+$("#cartBody").onclick=e=>{const b=e.target.closest("button");if(!b)return;const k=+b.dataset.k,d=b.dataset.d;
+  if(d==="x")cart.splice(k,1);else{cart[k].qty+=+d;if(cart[k].qty<1)cart.splice(k,1)}save();drawCart()};
+$("#cartFoot").onclick=e=>{if(e.target.id==="go")checkout()};
+function checkout(){
+  $("#cartBody").innerHTML=`<div class="f"><input id="n" placeholder="Họ và tên" autocomplete="name"><input id="ph" type="tel" placeholder="Số điện thoại" autocomplete="tel"><textarea id="ad" rows="3" placeholder="Địa chỉ nhận hàng"></textarea><textarea id="nt" rows="2" placeholder="Ghi chú (không bắt buộc)"></textarea></div>`;
+  $("#cartFoot").innerHTML='<button class="btn" id="mk">Tạo đơn hàng</button><button class="btn alt" id="back">Quay lại giỏ hàng</button>';
+  $("#mk").onclick=()=>{
+    const n=$("#n").value.trim(),ph=$("#ph").value.trim(),ad=$("#ad").value.trim();
+    if(!n||!ph||!ad){toast("Vui lòng nhập tên, số điện thoại và địa chỉ");return}
+    const {sub,ship}=totals();
+    const txt=`ĐƠN HÀNG ${SHOP.name}\nKhách: ${n}\nSĐT: ${ph}\nĐịa chỉ: ${ad}\n`+(($("#nt").value.trim())?`Ghi chú: ${$("#nt").value.trim()}\n`:"")+"\n"+cart.map(i=>`- ${byId(i.id).name} (size ${i.size}) x${i.qty}: ${money(byId(i.id).price*i.qty)}`).join("\n")+`\n\nPhí giao hàng: ${ship?money(ship):"Miễn phí"}\nTổng cộng: ${money(sub+ship)} (thanh toán khi nhận hàng)`;
+    $("#cartBody").innerHTML=`<p>Đơn của bạn đã sẵn sàng. Sao chép nội dung và gửi cho shop qua Zalo để được xác nhận.</p><textarea class="out" id="ot" readonly>${txt.replace(/</g,"&lt;")}</textarea>`;
+    $("#cartFoot").innerHTML=`<button class="btn" id="cp">Sao chép đơn hàng</button><a class="btn alt" href="${SHOP.zalo}" target="_blank" rel="noopener" style="text-align:center">Mở Zalo của shop</a>`;
+    $("#cp").onclick=async()=>{try{await navigator.clipboard.writeText(txt);toast("Đã sao chép đơn hàng")}catch(e){$("#ot").select();toast("Hãy nhấn giữ để sao chép")}};
+  };
+  $("#back").onclick=drawCart;
+}
+const open=v=>{$("#drawer").classList.toggle("on",v);$("#veil").classList.toggle("on",v)};
+$("#openCart").onclick=()=>open(true);$("#closeCart").onclick=()=>open(false);$("#veil").onclick=()=>open(false);
+document.addEventListener("keydown",e=>{if(e.key==="Escape")open(false)});
+init();
+</script>
+</body>
+</html>
