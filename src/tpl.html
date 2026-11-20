@@ -1,0 +1,147 @@
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<pattern id="pt-dots" width="14" height="14" patternUnits="userSpaceOnUse"><circle cx="4" cy="4" r="2" fill="#fff" opacity=".75"/><circle cx="11" cy="11" r="1.5" fill="#fff" opacity=".55"/></pattern>
+<pattern id="pt-stripe" width="10" height="10" patternUnits="userSpaceOnUse"><rect width="4" height="10" fill="#fff" opacity=".35"/></pattern>
+<pattern id="pt-check" width="16" height="16" patternUnits="userSpaceOnUse"><rect width="8" height="16" fill="#fff" opacity=".24"/><rect width="16" height="8" fill="#fff" opacity=".24"/></pattern>
+</defs></svg>
+
+<div class="admbar" id="admbar" hidden><span>Bạn đang mở bằng tài khoản quản trị.</span><button class="lnk" data-a="adm">Mở trang quản trị</button></div>
+<div class="tick" id="tick"></div>
+<header>
+<div class="hrow">
+<a class="logo" href="#top" id="logo"></a>
+<input class="search" id="q" type="search" placeholder="Tìm váy, áo, set…" aria-label="Tìm sản phẩm">
+<button class="ic" data-a="fav" aria-label="Món đã lưu"><svg class="i" viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg><b class="n" id="wc"></b></button>
+<button class="ic" data-a="cart" aria-label="Giỏ hàng"><svg class="i" viewBox="0 0 24 24"><path d="M6 8h12l-1 12H7L6 8zM9 8V6a3 3 0 0 1 6 0v2"/></svg><b class="n cc"></b></button>
+</div>
+<nav class="chips" id="chips" aria-label="Danh mục"></nav>
+</header>
+
+<main id="top">
+<section class="hero">
+<div class="cover"><img id="cover" width="1408" height="768" alt="Ảnh bìa của shop"></div>
+<div class="wrap intro">
+<h1 id="hl"></h1>
+<div>
+<p id="intro"></p>
+<div class="cta"><a class="btn" href="#shop">Xem hàng mới</a><button class="btn ghost" data-a="sz">Tìm size của tôi</button></div>
+</div>
+</div></section>
+
+<section class="sale" id="sale"><div class="wrap">
+<h2 id="saleT"></h2>
+<div class="clock" id="clock" aria-hidden="true"></div>
+<div class="row" id="saleRow"></div>
+</div></section>
+
+<section class="sec" id="shop"><div class="wrap">
+<h2 id="gt">Hàng mới về</h2>
+<div class="bar"><span class="mute sm" id="count"></span>
+<select id="sort" aria-label="Sắp xếp"><option value="">Mới nhất</option><option value="asc">Giá thấp đến cao</option><option value="desc">Giá cao đến thấp</option></select></div>
+<div class="grid" id="grid"></div>
+<div class="morew" id="moreW"></div>
+</div></section>
+
+<section class="sec" id="looksS"><div class="wrap">
+<h2>Phối sẵn, mua một lần</h2>
+<p class="sub">Các món đã được phối hợp nhau. Mua cả bộ được giảm thêm.</p>
+<div class="looks" id="looks"></div>
+</div></section>
+
+<section class="sec"><div class="wrap">
+<h2 id="serveT"></h2>
+<div class="serve" id="serve"></div>
+</div></section>
+
+<section class="sec" id="faq"><div class="wrap">
+<h2>Câu hỏi hay gặp</h2>
+<div class="tw"><table><thead><tr><th>Size</th><th>Cân nặng</th><th>Ngực</th><th>Eo</th><th>Mông</th></tr></thead><tbody id="sizeT"></tbody></table></div>
+<div id="faqL"></div>
+</div></section>
+</main>
+
+<footer><div class="wrap" id="foot"></div></footer>
+
+<section class="admin" id="admin" hidden>
+<div class="ahead">
+<div class="wrap atop"><h1>Quản trị</h1><button class="btn ghost sm2" data-a="shopview">Xem cửa hàng</button></div>
+<nav class="chips" id="atabs" aria-label="Mục quản trị"><button class="chip" data-a="atab" data-t="sp" aria-pressed="true">Sản phẩm</button><button class="chip" data-a="atab" data-t="shop" aria-pressed="false">Cửa hàng</button><button class="chip" data-a="atab" data-t="vc" aria-pressed="false">Mã giảm giá</button></nav>
+</div>
+<div class="wrap abody" id="abody"></div>
+</section>
+
+<nav class="tab" aria-label="Điều hướng nhanh">
+<button data-a="top"><svg class="i" viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/></svg>Trang chủ</button>
+<button data-a="fav"><svg class="i" viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>Yêu thích</button>
+<button data-a="cart"><span class="w"><svg class="i" viewBox="0 0 24 24"><path d="M6 8h12l-1 12H7L6 8zM9 8V6a3 3 0 0 1 6 0v2"/></svg><b class="n cc"></b></span>Giỏ hàng</button>
+<button data-a="chat"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg>Chat</button>
+</nav>
+<button class="btn fab" data-a="chat" aria-label="Chat với shop"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg></button>
+
+<div class="savebar" id="savebar" hidden><span id="saveMsg"></span><span class="sbtn"><button class="lnk" data-a="discard" id="discardB">Bỏ thay đổi</button><button class="btn" data-a="savepub">Lưu và đưa lên web</button></span></div>
+
+<div class="veil" id="veil" data-a="close"></div>
+<aside class="sheet" id="pd" aria-label="Chi tiết sản phẩm">
+<div class="sh"><h2 id="pdT"></h2><button class="x" data-a="close" aria-label="Đóng">×</button></div>
+<div class="sb" id="pdB"></div>
+<div class="sf two"><button class="btn ghost" data-a="add">Thêm vào giỏ</button><button class="btn" data-a="buy">Mua ngay</button></div>
+</aside>
+<aside class="sheet" id="cart" aria-label="Giỏ hàng">
+<div class="sh"><h2 id="cartT">Giỏ hàng</h2><button class="x" data-a="close" aria-label="Đóng">×</button></div>
+<div class="sb" id="cartB"></div>
+<div class="sf" id="cartF"></div>
+</aside>
+<aside class="sheet" id="chat" aria-label="Chat tự động">
+<div class="sh"><h2>Trợ lý tự động</h2><button class="x" data-a="close" aria-label="Đóng">×</button></div>
+<div class="sb" id="chatB"><div class="msgs" id="msgs" aria-live="polite"></div><div class="qs" id="qs"></div></div>
+<div class="sf"><div class="chin"><input id="chI" placeholder="Nhập câu hỏi, ví dụ 1m58 48kg" aria-label="Câu hỏi của bạn"><button class="btn" data-a="send">Gửi</button></div></div>
+</aside>
+<aside class="sheet" id="ed" aria-label="Sửa sản phẩm">
+<div class="sh"><h2 id="edT"></h2><button class="x" data-a="close" aria-label="Đóng">×</button></div>
+<div class="sb" id="edB"></div>
+<div class="sf two"><button class="btn ghost" data-a="eddel" id="edDel">Xóa sản phẩm</button><button class="btn" data-a="eddone">Xong</button></div>
+</aside>
+<input type="file" id="phFiles" class="vh" accept="image/*" multiple aria-label="Chọn ảnh sản phẩm">
+<input type="file" id="impFiles" class="vh" accept="image/*" multiple aria-label="Chọn ảnh để nhập hàng loạt">
+<input type="file" id="impDir" class="vh" webkitdirectory multiple aria-label="Chọn thư mục ảnh">
+<input type="file" id="impSheet" class="vh" accept=".xlsx,.xls,.csv,.tsv,.txt,text/csv" aria-label="Chọn bảng giá">
+<input type="file" id="logoFile" class="vh" accept="image/png" aria-label="Chọn logo PNG nền trong suốt">
+<input type="file" id="covFile" class="vh" accept="image/*" aria-label="Chọn ảnh bìa">
+<aside class="sheet" id="phed" aria-label="Chỉnh ảnh sản phẩm">
+<div class="sh"><h2>Chỉnh ảnh</h2><button class="x" data-a="phclose" aria-label="Đóng">×</button></div>
+<div class="sb" id="phB">
+<div class="pvw"><canvas id="pvC" width="800" height="1000" aria-label="Ảnh xem trước. Chạm để đặt logo, hoặc tô lên chữ cần xóa."></canvas></div>
+<nav class="opt" id="phMode" style="margin-top:12px" aria-label="Chế độ"><button class="o" data-a="phmode" data-v="move" aria-pressed="true">Dời logo</button><button class="o" data-a="phmode" data-v="erase" aria-pressed="false">Tô để xóa chữ</button></nav>
+<p class="sm mute" id="phHint" style="margin:8px 0 0"></p>
+<div class="ctl" id="phMove">
+<div><div class="lbl" style="margin-top:0"><span>Màu logo</span></div><div class="opt" id="phVar"></div></div>
+<label for="phSz">Cỡ logo<input type="range" id="phSz" min="18" max="60" step="1"></label>
+<button class="btn ghost sm2" data-a="phalt" style="justify-self:start">Vị trí gợi ý khác</button>
+</div>
+<div class="ctl" id="phErase" hidden>
+<label for="phBr">Cỡ cọ<input type="range" id="phBr" min="10" max="90" step="2" value="34"></label>
+<div class="opt"><button class="btn sm2" data-a="pherase">Xóa vùng đã tô</button><button class="btn ghost sm2" data-a="phmaskx">Bỏ vùng tô</button><button class="btn ghost sm2" data-a="phundo" id="phUndo" hidden>Hoàn tác</button></div>
+</div>
+<div class="opt" style="margin-top:18px"><button class="lnk" data-a="phmain" id="phMain">Đặt làm ảnh chính</button><button class="lnk" data-a="phdel" id="phDel">Bỏ ảnh này</button></div>
+</div>
+<div class="sf two"><button class="btn ghost" data-a="phclose">Hủy</button><button class="btn" data-a="phdone" id="phDone">Xong</button></div>
+</aside>
+<aside class="sheet" id="imp" aria-label="Nhập hàng loạt">
+<div class="sh"><h2>Nhập hàng loạt</h2><button class="x" data-a="close" aria-label="Đóng">×</button></div>
+<div class="sb" id="impB"></div>
+<div class="sf" id="impF"></div>
+</aside>
+<aside class="sheet" id="wmed" aria-label="Mẫu xóa watermark">
+<div class="sh"><h2>Mẫu xóa watermark</h2><button class="x" data-a="wmclose" aria-label="Đóng">×</button></div>
+<div class="sb" id="wmB">
+<div class="pvw"><canvas id="wmC" width="800" height="1000" aria-label="Ảnh mẫu. Kéo để khoanh chỗ có watermark, chạm vào ô đã khoanh để bỏ."></canvas></div>
+<p class="sm" id="wmS" style="margin:10px 0 0"></p>
+<div class="opt" style="margin-top:10px"><button class="btn ghost sm2" data-a="wmtest" id="wmTest">Xem thử sau khi xóa</button><button class="btn ghost sm2" data-a="wmnext" id="wmNext">Ảnh khác</button><button class="btn ghost sm2" data-a="wmauto">Tự tìm lại</button></div>
+<div class="opt" style="margin-top:6px"><button class="lnk" data-a="wmundo">Bỏ vùng vừa khoanh</button><button class="lnk" data-a="wmclr">Bỏ hết</button></div>
+<div class="f" style="margin-top:14px"><label for="wmName">Tên mẫu, ví dụ tên nhà sỉ<input id="wmName" maxlength="40" placeholder="Xưởng Hà Nội"></label></div>
+<p class="sm mute">Kéo trên ảnh để khoanh thêm chỗ có watermark, chạm vào ô đã khoanh để bỏ ô đó. Khoanh rộng hơn chữ một chút. Bấm Ảnh khác để chắc mẫu đúng với mọi ảnh.</p>
+</div>
+<div class="sf two"><button class="btn ghost" data-a="wmclose">Quay lại</button><button class="btn" data-a="wmsave">Lưu mẫu</button></div>
+</aside>
+<div class="job" id="job" hidden role="status" aria-live="polite"><div class="jrow"><b id="jobT"></b><span id="jobS" class="sm"></span></div><div class="meter"><i id="jobBar"></i></div><div class="jrow"><button class="lnk" data-a="jobstop" id="jobStop">Dừng</button><button class="lnk" data-a="jobok" id="jobOk" hidden>Đóng</button></div></div>
+<div class="toast" id="toast" role="status"></div>
