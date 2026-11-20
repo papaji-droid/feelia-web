@@ -3,7 +3,7 @@
 # Khong dung disk (free plan): du lieu se mat moi lan deploy/restart.
 services:
   - type: web
-    name: feelia-web
+    name: free-a
     runtime: node
     plan: starter
     buildCommand: npm ci --omit=dev

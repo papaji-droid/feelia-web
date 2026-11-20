@@ -12,7 +12,7 @@ run-local.bat            # hoac: npm install && npm start
 - Sua `src/app.js`, `src/*.css`, `src/tpl.html` roi F5 la thay ngay (khi chua dat NODE_ENV=production).
 
 ## Deploy len Render
-1. Day repo len GitHub, Render > New > Blueprint > chon repo (dung `render.yaml`).
+1. Day repo len GitHub, Render > New > Blueprint > chon repo (dung `render.yaml`). Link web: https://free-a.onrender.com (ten service `free-a`).
 2. Plan `starter` + Persistent Disk `/var/data` de SQLite khong mat du lieu (plan free khong co disk).
 3. `ADMIN_PASSWORD` duoc Render tu sinh: xem o Environment cua service.
 4. Sau deploy: mo `/admin`, dang nhap, tai anh san pham lai (anh cu tren nen tang cu khong di theo repo).
