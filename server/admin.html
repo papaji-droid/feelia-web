@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>FREE.A Quản trị</title>
+<style>
+:root{--bg:#faf6f1;--fg:#2d2420;--mut:#7d6f66;--line:#e5dacd;--card:#fff;--ac:#8a6a4a;--bad:#b3261e}
+@media (prefers-color-scheme:dark){:root{--bg:#1b1613;--fg:#f0e8df;--mut:#a39587;--line:#3a312a;--card:#252019;--ac:#c9a57a;--bad:#f2928b}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 "Be Vietnam Pro",system-ui,sans-serif}
+header{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:14px 16px;border-bottom:1px solid var(--line)}
+header h1{font-size:20px;margin:0;flex:1}
+main{max-width:980px;margin:0 auto;padding:16px}
+.btn{font:inherit;border:1px solid var(--ac);background:var(--ac);color:#fff;border-radius:8px;padding:7px 14px;cursor:pointer;text-decoration:none;display:inline-block}
+.btn.ghost{background:none;color:var(--ac)}
+input,select{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--fg)}
+.mut{color:var(--mut)}.bad{color:var(--bad)}
+.stats{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 14px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px;min-width:120px}
+.stat b{display:block;font-size:22px}
+.order{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:0 0 10px}
+.order .top{display:flex;gap:8px 14px;align-items:center;flex-wrap:wrap}
+.order .top b{font-size:16px}.grow{flex:1}
+pre{white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;margin:10px 0 0;font:13px/1.5 ui-monospace,Consolas,monospace}
+.tag{font-size:12px;padding:2px 8px;border-radius:99px;border:1px solid var(--line)}
+.tag.new{border-color:var(--ac);color:var(--ac)}
+#login{max-width:340px;margin:60px auto;display:grid;gap:10px}
+</style>
+</head>
+<body>
+<header>
+  <h1>FREE.A · Quản trị</h1>
+  <span id="nav" hidden>
+    <a class="btn ghost" href="/#quan-tri">Sản phẩm, giá, mã giảm giá</a>
+    <a class="btn ghost" href="/" target="_blank" rel="noopener">Xem cửa hàng</a>
+    <a class="btn ghost" href="/api/backup">Tải sao lưu</a>
+    <button class="btn ghost" id="out">Đăng xuất</button>
+  </span>
+</header>
+<main>
+  <form id="login" hidden>
+    <p class="mut">Nhập mật khẩu quản trị.</p>
+    <input id="pw" type="password" autocomplete="current-password" placeholder="Mật khẩu" required>
+    <p class="bad" id="err" role="alert"></p>
+    <button class="btn" type="submit">Đăng nhập</button>
+  </form>
+  <section id="app" hidden>
+    <div class="stats" id="stats"></div>
+    <p><select id="flt" aria-label="Lọc đơn"></select> <button class="btn ghost" id="reload">Tải lại</button></p>
+    <div id="list"></div>
+  </section>
+</main>
+<script>
+(function(){
+"use strict";
+var ST={new:"Mới",confirmed:"Đã xác nhận",shipping:"Đang giao",done:"Hoàn tất",cancelled:"Đã hủy"};
+var $=function(s){return document.querySelector(s)};
+var orders=[];
+function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e}
+var money=function(n){return(+n||0).toLocaleString("vi-VN")+"₫"};
+async function api(u,o){var r=await fetch(u,Object.assign({credentials:"same-origin"},o||{}));if(r.status===401){show(false);throw 0}return r}
+function show(ok){$("#login").hidden=ok;$("#app").hidden=!ok;$("#nav").hidden=!ok}
+async function load(){
+  var r=await api("/api/orders"),d=await r.json();orders=d.orders;
+  var c=d.counts,by={};orders.forEach(function(o){by[o.status]=(by[o.status]||0)+1});
+  var rev=orders.filter(function(o){return o.status!=="cancelled"}).reduce(function(n,o){return n+o.total},0);
+  var s=$("#stats");s.textContent="";
+  [["Sản phẩm",c.products],["Đơn hàng",c.orders],["Đơn mới",by.new||0],["Doanh thu (trừ đơn hủy)",money(rev)],["Ảnh trong kho",c.assets]].forEach(function(x){var b=el("div","stat");b.appendChild(el("span","mut",x[0]));b.appendChild(el("b",null,x[1]));s.appendChild(b)});
+  draw();
+}
+function draw(){
+  var f=$("#flt").value,l=$("#list");l.textContent="";
+  var rows=orders.filter(function(o){return !f||o.status===f});
+  if(!rows.length){l.appendChild(el("p","mut","Chưa có đơn hàng nào."));return}
+  rows.forEach(function(o){
+    var b=el("div","order"),t=el("div","top");
+    t.appendChild(el("b",null,o.code));t.appendChild(el("span","tag "+o.status,ST[o.status]||o.status));
+    t.appendChild(el("span","mut",o.created_at+" UTC"));t.appendChild(el("span","grow"));t.appendChild(el("b",null,money(o.total)));
+    b.appendChild(t);
+    b.appendChild(el("div",null,o.name+" · "+o.phone));
+    b.appendChild(el("div","mut",o.address+" · "+o.pay));
+    var sel=el("select");sel.setAttribute("aria-label","Trạng thái đơn "+o.code);
+    Object.keys(ST).forEach(function(k){var op=el("option",null,ST[k]);op.value=k;if(k===o.status)op.selected=true;sel.appendChild(op)});
+    sel.onchange=async function(){await api("/api/orders/"+o.id,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({status:sel.value})});load()};
+    var det=el("button","btn ghost","Chi tiết"),del=el("button","btn ghost","Xóa");
+    var pre=el("pre",null,o.text||"");pre.hidden=true;
+    det.onclick=function(){pre.hidden=!pre.hidden};
+    del.onclick=async function(){if(!confirm("Xóa đơn "+o.code+"?"))return;await api("/api/orders/"+o.id,{method:"DELETE"});load()};
+    var act=el("div","top");act.style.marginTop="8px";[sel,det,del].forEach(function(x){act.appendChild(x)});
+    b.appendChild(act);b.appendChild(pre);l.appendChild(b);
+  });
+}
+var fl=$("#flt");var a=el("option",null,"Tất cả đơn");a.value="";fl.appendChild(a);
+Object.keys(ST).forEach(function(k){var o=el("option",null,ST[k]);o.value=k;fl.appendChild(o)});
+fl.onchange=draw;$("#reload").onclick=load;
+$("#out").onclick=async function(){await fetch("/api/logout",{method:"POST"});location.reload()};
+$("#login").onsubmit=async function(e){e.preventDefault();$("#err").textContent="";
+  var r=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:$("#pw").value})});
+  if(r.ok)location.reload();else $("#err").textContent=r.status===429?"Thử sai quá nhiều lần, chờ vài phút.":"Mật khẩu chưa đúng."};
+fetch("/api/me",{credentials:"same-origin"}).then(function(r){return r.json()}).then(function(m){show(m.admin);if(m.admin)load()});
+})();
+</script>
+</body>
+</html>

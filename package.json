@@ -1,0 +1,17 @@
+{
+  "name": "feelia-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "FREE.A: web ban hang + trang quan tri + co so du lieu SQLite",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "node --watch server/server.js"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}

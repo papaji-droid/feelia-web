@@ -245,6 +245,7 @@ function place(){
    +cart.map(i=>{const p=P(i.id);return `- ${p.name} (${p.colors[i.ci][0]}, size ${i.size}) x${i.qty}: ${money(priceOf(p)*i.qty)}`}).join("\n")
    +`\n\nTạm tính: ${money(t.sub)}`+(t.look?`\nGiảm phối sẵn: -${money(t.look)}`:"")+(t.vd?`\nMã ${code}: -${money(t.vd)}`:"")+`\nGiao hàng: ${t.ship?money(t.ship):"Miễn phí"}\nTỔNG CỘNG: ${money(t.total)}`;
   orders.unshift({code:cd,time:d.toLocaleString("vi-VN"),total:t.total,status:"đã tạo, chờ shop xác nhận qua Zalo"});orders=orders.slice(0,20);ls.set("fl_orders",orders);
+  try{fetch("/api/orders",{method:"POST",headers:{"Content-Type":"application/json"},keepalive:true,body:JSON.stringify({code:cd,name:n,phone:pn,address:ad,pay,note:g,voucher:code,total:t.total,text:lastTxt,items:cart.map(i=>({id:i.id,ci:i.ci,size:i.size,qty:i.qty}))})}).catch(()=>{})}catch(e){}
   cart=[];code="";ls.set("fl_cart",cart);badge();
   $("#cartT").textContent="Đã tạo đơn "+cd;
   $("#cartB").innerHTML=`<p><b>Còn một bước:</b> gửi nội dung đơn cho shop qua Zalo để được xác nhận và giao hàng.</p><textarea class="out" id="oT" readonly></textarea>${SHOP.bank&&pay==="Chuyển khoản"?`<p><b>Chuyển khoản:</b> ${esc(SHOP.bank)}</p>`:""}<p class="sm mute">Lưu mã <b>${cd}</b> để tra đơn trong mục Chat.</p>`;
@@ -813,7 +814,7 @@ async function savepub(){
   if((JOB&&!JOB.end)||pend)return toast("Đang xử lý ảnh, chờ xong rồi lưu");
   saving=true;bar("Đang lưu…");
   const af=await use("artifact");
-  if(!af){saving=false;bar("Chưa lưu được ở đây. Hãy mở trang này trong Claude bằng tài khoản chủ trang.");return}
+  if(!af){saving=false;bar("Chưa lưu được ở đây. Hãy đăng nhập quản trị lại.");return}
   prune();DB.rev=BASE_REV+1;let html="";
   try{html=buildDoc()}catch(e){DB.rev=BASE_REV;saving=false;bar("Chưa lưu được vì dữ liệu có lỗi.");return}
   try{
@@ -834,7 +835,13 @@ function discard(){
 /* ---- ba mục quản trị ---- */
 function drawAdmin(){
   const b=$("#abody");
-  if(!canEdit){$("#atabs").hidden=true;b.innerHTML=`<p class="mute">${checked?"Trang quản trị chỉ mở được khi bạn xem trang này trong Claude bằng tài khoản có quyền sửa.":"Đang kiểm tra quyền chỉnh sửa…"}</p>`;return}
+  if(!canEdit){$("#atabs").hidden=true;
+    b.innerHTML=checked?`<form class="f" id="loginF" style="max-width:360px"><p class="mute">Nhập mật khẩu quản trị để chỉnh sửa cửa hàng.</p><label>Mật khẩu<input id="loginP" type="password" autocomplete="current-password" required></label><p class="sm bad" id="loginE" role="alert"></p><button class="btn" type="submit">Đăng nhập</button></form>`:`<p class="mute">Đang kiểm tra quyền chỉnh sửa…</p>`;
+    const f=$("#loginF");if(f)f.onsubmit=async ev=>{ev.preventDefault();$("#loginE").textContent="";
+      try{const r=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:$("#loginP").value})});
+        if(r.ok){location.reload();return}$("#loginE").textContent=r.status===429?"Thử sai quá nhiều lần. Chờ vài phút rồi thử lại.":"Mật khẩu chưa đúng."}
+      catch(e){$("#loginE").textContent="Chưa kết nối được máy chủ."}};
+    return}
   $("#atabs").hidden=false;$$("#atabs .chip").forEach(c=>c.setAttribute("aria-pressed",c.dataset.t===atab));
   b.innerHTML=atab==="sp"?admProducts():atab==="shop"?admShop():admVouchers();
   if(atab==="sp")drawAList();if(atab==="shop")storage();
@@ -870,12 +877,12 @@ function admShop(){
   ${DB.wm.length?DB.wm.map((w,i)=>`<div class="vrow wmrow"><span><b>${esc(w.name)}</b> <span class="mute sm">${w.r.length} vùng</span></span><button class="lnk" data-a="wmdel" data-i="${i}">Xóa mẫu</button></div>`).join(""):'<p class="sm mute">Chưa có mẫu nào.</p>'}
   <h2 class="asec">Kho ảnh</h2><p class="sm" id="stInfo">Đang kiểm tra…</p><p><button class="btn ghost sm2" data-a="clean" id="cleanB" hidden></button></p>
   <h2 class="asec">Ảnh bìa</h2><div class="covprev">${MEDIA.cover?`<img src="${MEDIA.cover}" alt="Ảnh bìa hiện tại">`:""}</div><p style="margin-top:10px"><label class="btn ghost sm2" for="covFile">Đổi ảnh bìa</label></p><p class="sm mute">Ảnh ngang, rộng từ 1400 px trở lên là đẹp nhất.</p>
-  <h2 class="asec">Sao lưu</h2><p class="sm mute">Sao chép toàn bộ dữ liệu cửa hàng, không gồm ảnh, để lưu lại hoặc gửi cho Claude.</p><button class="btn ghost sm2" data-a="copydata">Sao chép dữ liệu</button><textarea class="out" id="dataOut" hidden readonly aria-label="Dữ liệu cửa hàng"></textarea>`;
+  <h2 class="asec">Sao lưu</h2><p class="sm mute">Sao chép toàn bộ dữ liệu cửa hàng, không gồm ảnh, để lưu lại.</p><button class="btn ghost sm2" data-a="copydata">Sao chép dữ liệu</button><textarea class="out" id="dataOut" hidden readonly aria-label="Dữ liệu cửa hàng"></textarea>`;
 }
 function refsIn(db){const s=new Set();(db.products||[]).forEach(p=>(p.photos||[]).forEach(x=>[x.s,x.o].forEach(r=>{if(typeof r==="string"&&r[0]==="a")s.add(r.slice(2))})));return s}
 async function storage(){
   const el=$("#stInfo");if(!el)return;const a=await assets();
-  if(!a){el.textContent="Kho ảnh chưa mở được ở đây, ảnh mới sẽ được nhúng thẳng vào trang (tối đa khoảng 60 ảnh). Mở trang trong Claude bằng tài khoản chủ trang để dùng kho ảnh.";return}
+  if(!a){el.textContent="Kho ảnh chưa mở được, ảnh mới sẽ được nhúng thẳng vào trang (tối đa khoảng 60 ảnh).";return}
   try{const r=await a.list(),u=r.usage||{},mb=v=>(v/1048576).toFixed(v<1048576*10?1:0).replace(".",",");
     const used=refsIn(DB),saved=refsIn(JSON.parse(ORIG));ORPH=(r.assets||[]).filter(x=>!used.has(x.id)&&!saved.has(x.id)).map(x=>x.id);
     if(!$("#stInfo"))return;$("#stInfo").textContent=`Đang dùng ${u.files||0}${u.maxFiles?"/"+u.maxFiles:""} ảnh, ${mb(u.bytes||0)}${u.maxBytes?"/"+mb(u.maxBytes):""} MB. Mỗi ảnh sản phẩm chiếm 2 chỗ: bản gốc và bản đã gán logo.`;

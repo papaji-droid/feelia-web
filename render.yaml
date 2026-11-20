@@ -1,0 +1,26 @@
+# Render Blueprint: Dashboard > New > Blueprint, tro toi repo nay.
+# SQLite luu tren Persistent Disk, can plan tra phi (starter tro len).
+# Khong dung disk (free plan): du lieu se mat moi lan deploy/restart.
+services:
+  - type: web
+    name: feelia-web
+    runtime: node
+    plan: starter
+    buildCommand: npm ci --omit=dev
+    startCommand: node server/server.js
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: 24
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /var/data
+      - key: ADMIN_PASSWORD
+        generateValue: true
+      - key: SESSION_SECRET
+        generateValue: true
+    disk:
+      name: feelia-data
+      mountPath: /var/data
+      sizeGB: 1
