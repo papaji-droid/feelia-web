@@ -1,124 +1,164 @@
 "use strict";
-// Co so du lieu SQLite (node:sqlite co san trong Node >= 22.13, khong can cai them goi native).
+// Co so du lieu: Postgres khi co DATABASE_URL (Render), nguoc lai SQLite file (chay local).
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const { DatabaseSync } = require("node:sqlite");
 
-const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(__dirname, "..", "data"));
-fs.mkdirSync(DATA_DIR, { recursive: true });
-const FILE = path.join(DATA_DIR, "feelia.db");
-const db = new DatabaseSync(FILE);
+const PG_URL = process.env.DATABASE_URL || "";
+const KIND = PG_URL ? "postgres" : "sqlite";
+let DESC = "";
+let conn; // { all, get, run, tx }
 
-db.exec(`
-PRAGMA journal_mode = WAL;
-PRAGMA foreign_keys = ON;
-CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS products (
-  id INTEGER PRIMARY KEY,
-  pos INTEGER NOT NULL,
-  data TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS assets (
-  id TEXT PRIMARY KEY,
-  mime TEXT NOT NULL,
-  bytes INTEGER NOT NULL,
-  data BLOB NOT NULL,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-CREATE TABLE IF NOT EXISTS orders (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  code TEXT NOT NULL UNIQUE,
-  name TEXT NOT NULL,
-  phone TEXT NOT NULL,
-  address TEXT NOT NULL,
-  pay TEXT NOT NULL,
-  note TEXT NOT NULL DEFAULT '',
-  voucher TEXT NOT NULL DEFAULT '',
-  total INTEGER NOT NULL DEFAULT 0,
-  items TEXT NOT NULL,
-  text TEXT NOT NULL DEFAULT '',
-  status TEXT NOT NULL DEFAULT 'new',
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-CREATE INDEX IF NOT EXISTS orders_created ON orders(created_at DESC);
-`);
+if (PG_URL) {
+  const { Pool } = require("pg");
+  const pool = new Pool({
+    connectionString: PG_URL,
+    ssl: process.env.PGSSL === "1" ? { rejectUnauthorized: false } : undefined, // URL ngoai cua Render can SSL; URL noi bo thi khong
+    max: 5,
+  });
+  const conv = (sql) => { let i = 0; return sql.replace(/\?/g, () => "$" + ++i); };
+  const wrap = (c) => ({
+    all: async (s, p = []) => (await c.query(conv(s), p)).rows,
+    get: async (s, p = []) => (await c.query(conv(s), p)).rows[0],
+    run: async (s, p = []) => ({ changes: (await c.query(conv(s), p)).rowCount }),
+  });
+  conn = {
+    ...wrap(pool),
+    exec: (s) => pool.query(s),
+    tx: async (fn) => {
+      const c = await pool.connect();
+      try { await c.query("BEGIN"); const r = await fn(wrap(c)); await c.query("COMMIT"); return r; }
+      catch (e) { try { await c.query("ROLLBACK"); } catch (_) {} throw e; }
+      finally { c.release(); }
+    },
+  };
+  try { DESC = "Postgres " + new URL(PG_URL).host; } catch (_) { DESC = "Postgres"; }
+} else {
+  const { DatabaseSync } = require("node:sqlite"); // co san trong Node >= 22.13
+  const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(__dirname, "..", "data"));
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  const FILE = path.join(DATA_DIR, "feelia.db");
+  const sdb = new DatabaseSync(FILE);
+  const wrap = () => ({
+    all: async (s, p = []) => sdb.prepare(s).all(...p),
+    get: async (s, p = []) => sdb.prepare(s).get(...p),
+    run: async (s, p = []) => ({ changes: sdb.prepare(s).run(...p).changes }),
+  });
+  let queue = Promise.resolve(); // SQLite chi co 1 ket noi: cho giao dich xep hang
+  conn = {
+    ...wrap(),
+    exec: async (s) => sdb.exec(s),
+    tx: (fn) => {
+      const job = queue.then(async () => {
+        sdb.exec("BEGIN IMMEDIATE");
+        try { const r = await fn(wrap()); sdb.exec("COMMIT"); return r; }
+        catch (e) { try { sdb.exec("ROLLBACK"); } catch (_) {} throw e; }
+      });
+      queue = job.catch(() => {});
+      return job;
+    },
+  };
+  DESC = "SQLite " + FILE;
+}
 
-const q = (sql) => db.prepare(sql);
-const tx = (fn) => {
-  db.exec("BEGIN IMMEDIATE");
-  try { const r = fn(); db.exec("COMMIT"); return r; }
-  catch (e) { try { db.exec("ROLLBACK"); } catch (_) {} throw e; }
-};
+const NOW = PG_URL ? "to_char(now() at time zone 'utc','YYYY-MM-DD HH24:MI:SS')" : "datetime('now')";
+const BIN = PG_URL ? "BYTEA" : "BLOB";
+const SERIAL = PG_URL ? "SERIAL PRIMARY KEY" : "INTEGER PRIMARY KEY AUTOINCREMENT";
 
-const getMeta = (k, d) => {
-  const r = q("SELECT value FROM meta WHERE key = ?").get(k);
+async function init() {
+  if (!PG_URL) await conn.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");
+  const stmts = [
+    "CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS products (id INTEGER PRIMARY KEY, pos INTEGER NOT NULL, data TEXT NOT NULL)",
+    `CREATE TABLE IF NOT EXISTS assets (id TEXT PRIMARY KEY, mime TEXT NOT NULL, bytes INTEGER NOT NULL, data ${BIN} NOT NULL, created_at TEXT NOT NULL DEFAULT (${NOW}))`,
+    `CREATE TABLE IF NOT EXISTS orders (
+      id ${SERIAL}, code TEXT NOT NULL UNIQUE, name TEXT NOT NULL, phone TEXT NOT NULL, address TEXT NOT NULL,
+      pay TEXT NOT NULL, note TEXT NOT NULL DEFAULT '', voucher TEXT NOT NULL DEFAULT '', total INTEGER NOT NULL DEFAULT 0,
+      items TEXT NOT NULL, text TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'new',
+      created_at TEXT NOT NULL DEFAULT (${NOW}))`,
+    "CREATE INDEX IF NOT EXISTS orders_created ON orders(created_at DESC)",
+  ];
+  for (const s of stmts) await conn.exec(s);
+  await seedIfEmpty();
+}
+
+const getMeta = async (c, k, d) => {
+  const r = await c.get("SELECT value FROM meta WHERE key = ?", [k]);
   if (!r) return d;
   try { return JSON.parse(r.value); } catch (_) { return d; }
 };
-const setMeta = (k, v) =>
-  q("INSERT INTO meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(k, JSON.stringify(v));
+const setMeta = (c, k, v) =>
+  c.run("INSERT INTO meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", [k, JSON.stringify(v)]);
 
 /* ---------- cua hang ---------- */
-function getStore() {
-  const products = q("SELECT data FROM products ORDER BY pos").all().map((r) => JSON.parse(r.data));
+async function getStore() {
+  const products = (await conn.all("SELECT data FROM products ORDER BY pos")).map((r) => JSON.parse(r.data));
   return {
     v: 1,
-    rev: getMeta("rev", 0),
-    shop: getMeta("shop", {}),
-    brand: getMeta("brand", { st: "f", sz: 34 }),
-    wm: getMeta("wm", []),
-    vouchers: getMeta("vouchers", []),
-    looks: getMeta("looks", []),
+    rev: await getMeta(conn, "rev", 0),
+    shop: await getMeta(conn, "shop", {}),
+    brand: await getMeta(conn, "brand", { st: "f", sz: 34 }),
+    wm: await getMeta(conn, "wm", []),
+    vouchers: await getMeta(conn, "vouchers", []),
+    looks: await getMeta(conn, "looks", []),
     products,
   };
 }
-const getMedia = () => getMeta("media", { cover: "", logo0: "", logo: "", p: {} });
-const currentRev = () => getMeta("rev", 0);
+const getMedia = () => getMeta(conn, "media", { cover: "", logo0: "", logo: "", p: {} });
+const currentRev = () => getMeta(conn, "rev", 0);
 
-function saveStore(store, media) {
-  tx(() => {
-    setMeta("shop", store.shop || {});
-    setMeta("brand", store.brand || { st: "f", sz: 34 });
-    setMeta("wm", store.wm || []);
-    setMeta("vouchers", store.vouchers || []);
-    setMeta("looks", store.looks || []);
-    setMeta("media", media);
-    q("DELETE FROM products").run();
-    const ins = q("INSERT INTO products(id,pos,data) VALUES(?,?,?)");
-    (store.products || []).forEach((p, i) => ins.run(p.id, i, JSON.stringify(p)));
-    setMeta("rev", currentRev() + 1);
+// Luu trong 1 giao dich; neu baseRev khong con khop (nguoi khac vua luu) thi tra ve null.
+function saveStore(store, media, baseRev) {
+  return conn.tx(async (c) => {
+    const rev = await getMeta(c, "rev", 0);
+    if (baseRev != null && baseRev !== rev) return null;
+    await setMeta(c, "shop", store.shop || {});
+    await setMeta(c, "brand", store.brand || { st: "f", sz: 34 });
+    await setMeta(c, "wm", store.wm || []);
+    await setMeta(c, "vouchers", store.vouchers || []);
+    await setMeta(c, "looks", store.looks || []);
+    await setMeta(c, "media", media);
+    await c.run("DELETE FROM products");
+    let i = 0;
+    for (const p of store.products || []) await c.run("INSERT INTO products(id,pos,data) VALUES(?,?,?)", [p.id, i++, JSON.stringify(p)]);
+    await setMeta(c, "rev", rev + 1);
+    return rev + 1;
   });
-  return currentRev();
 }
 
 /* ---------- anh ---------- */
-function putAsset(buf, mime) {
+async function putAsset(buf, mime) {
   const id = crypto.randomBytes(16).toString("base64url");
-  q("INSERT INTO assets(id,mime,bytes,data) VALUES(?,?,?,?)").run(id, mime, buf.length, buf);
+  await conn.run("INSERT INTO assets(id,mime,bytes,data) VALUES(?,?,?,?)", [id, mime, buf.length, buf]);
   return id;
 }
-const getAsset = (id) => q("SELECT mime, data FROM assets WHERE id = ?").get(id);
-const delAsset = (id) => q("DELETE FROM assets WHERE id = ?").run(id).changes > 0;
-const listAssets = () => q("SELECT id, bytes FROM assets ORDER BY created_at").all();
+const getAsset = (id) => conn.get("SELECT mime, data FROM assets WHERE id = ?", [id]);
+const delAsset = async (id) => (await conn.run("DELETE FROM assets WHERE id = ?", [id])).changes > 0;
+const listAssets = () => conn.all("SELECT id, bytes FROM assets ORDER BY created_at");
 
 /* ---------- don hang ---------- */
-function addOrder(o) {
-  const r = q(
-    "INSERT OR IGNORE INTO orders(code,name,phone,address,pay,note,voucher,total,items,text) VALUES(?,?,?,?,?,?,?,?,?,?)"
-  ).run(o.code, o.name, o.phone, o.address, o.pay, o.note, o.voucher, o.total, JSON.stringify(o.items), o.text);
+async function addOrder(o) {
+  const r = await conn.run(
+    "INSERT INTO orders(code,name,phone,address,pay,note,voucher,total,items,text) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(code) DO NOTHING",
+    [o.code, o.name, o.phone, o.address, o.pay, o.note, o.voucher, o.total, JSON.stringify(o.items), o.text]
+  );
   return r.changes > 0;
 }
-const listOrders = (limit = 500) =>
-  q("SELECT * FROM orders ORDER BY id DESC LIMIT ?").all(limit).map((r) => ({ ...r, items: JSON.parse(r.items) }));
-const setOrderStatus = (id, status) => q("UPDATE orders SET status = ? WHERE id = ?").run(status, id).changes > 0;
-const deleteOrder = (id) => q("DELETE FROM orders WHERE id = ?").run(id).changes > 0;
+const listOrders = async (limit = 500) =>
+  (await conn.all("SELECT * FROM orders ORDER BY id DESC LIMIT ?", [limit])).map((r) => ({ ...r, items: JSON.parse(r.items) }));
+const setOrderStatus = async (id, status) => (await conn.run("UPDATE orders SET status = ? WHERE id = ?", [status, id])).changes > 0;
+const deleteOrder = async (id) => (await conn.run("DELETE FROM orders WHERE id = ?", [id])).changes > 0;
 
-/* ---------- du lieu mau: lan chay dau lay tu index.html trong repo ---------- */
-function seedIfEmpty() {
-  if (getMeta("rev", null) !== null) return false;
+async function counts() {
+  const n = async (t) => (await conn.get(`SELECT CAST(COUNT(*) AS INTEGER) AS n FROM ${t}`)).n;
+  return { products: await n("products"), orders: await n("orders"), assets: await n("assets") };
+}
+
+/* ---------- du lieu mau: lan chay dau (DB trong) lay tu index.html trong repo ---------- */
+async function seedIfEmpty() {
+  if ((await getMeta(conn, "rev", null)) !== null) return false;
   const file = path.join(__dirname, "..", "index.html");
-  if (!fs.existsSync(file)) { setMeta("rev", 1); setMeta("shop", { name: "FREE.A" }); return true; }
+  if (!fs.existsSync(file)) { await setMeta(conn, "rev", 1); await setMeta(conn, "shop", { name: "FREE.A" }); return true; }
   const html = fs.readFileSync(file, "utf8");
   const grab = (id) => {
     const m = html.match(new RegExp('<script type="application/json" id="' + id + '">([\\s\\S]*?)</script>'));
@@ -134,19 +174,13 @@ function seedIfEmpty() {
     dropped += p.photos.length - keep.length;
     if (keep.length) p.photos = keep; else delete p.photos;
   });
-  saveStore(store, media);
-  setMeta("rev", 1);
+  await saveStore(store, media, null);
   console.log(`[seed] ${store.products.length} san pham, ${(store.vouchers || []).length} ma giam gia. Bo ${dropped} anh tham chieu kho anh cu (khong con file).`);
   return true;
 }
 
 module.exports = {
-  FILE, DATA_DIR, seedIfEmpty, getStore, getMedia, currentRev, saveStore,
+  KIND, DESC, init, getStore, getMedia, currentRev, saveStore,
   putAsset, getAsset, delAsset, listAssets,
-  addOrder, listOrders, setOrderStatus, deleteOrder,
-  counts: () => ({
-    products: q("SELECT COUNT(*) n FROM products").get().n,
-    orders: q("SELECT COUNT(*) n FROM orders").get().n,
-    assets: q("SELECT COUNT(*) n FROM assets").get().n,
-  }),
+  addOrder, listOrders, setOrderStatus, deleteOrder, counts,
 };

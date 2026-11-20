@@ -1,11 +1,20 @@
 # Render Blueprint: Dashboard > New > Blueprint, tro toi repo nay.
-# SQLite luu tren Persistent Disk, can plan tra phi (starter tro len).
-# Khong dung disk (free plan): du lieu se mat moi lan deploy/restart.
+# Tao 1 Postgres (free) + 1 web service (free). Du lieu nam trong Postgres, khong can Persistent Disk.
+# Luu y goi free: Postgres bi xoa sau 30 ngay (nang len goi tra phi truoc han de giu du lieu),
+# web service ngu sau 15 phut khong co truy cap, lan mo dau mat ~30 giay.
+databases:
+  - name: free-a-db
+    plan: free
+    region: singapore
+    databaseName: freea
+    user: freea
+
 services:
   - type: web
     name: free-a
     runtime: node
-    plan: starter
+    plan: free
+    region: singapore
     buildCommand: npm ci --omit=dev
     startCommand: node server/server.js
     healthCheckPath: /healthz
@@ -14,13 +23,11 @@ services:
         value: 24
       - key: NODE_ENV
         value: production
-      - key: DATA_DIR
-        value: /var/data
+      - key: DATABASE_URL
+        fromDatabase:
+          name: free-a-db
+          property: connectionString
       - key: ADMIN_PASSWORD
         generateValue: true
       - key: SESSION_SECRET
         generateValue: true
-    disk:
-      name: feelia-data
-      mountPath: /var/data
-      sizeGB: 1

@@ -14,7 +14,6 @@ const SECRET = process.env.SESSION_SECRET || crypto.createHash("sha256").update(
 const SRC = path.join(__dirname, "..", "src");
 const read = (f) => fs.readFileSync(f, "utf8");
 
-db.seedIfEmpty();
 
 /* ---------- dung trang ban hang tu src/ + du lieu trong DB ---------- */
 const FONTS = "https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600&family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&display=swap";
@@ -29,9 +28,9 @@ function loadParts() {
     shim: read(path.join(__dirname, "shim.js")),
   };
 }
-function renderPage() {
+async function renderPage() {
   if (!parts || !PROD) parts = loadParts(); // khi dev, sua src/ la thay ngay
-  const s = db.getStore(), m = db.getMedia();
+  const s = await db.getStore(), m = await db.getMedia();
   const t = esc(s.shop.title || s.shop.name || "FREE.A"), d = esc(s.shop.desc || "");
   return '<!DOCTYPE html>\n<html lang="vi">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n<title>' + t + '</title>\n<meta name="description" content="' + d + '">\n<meta property="og:title" content="' + t + '">\n<meta property="og:description" content="' + d + '">\n<link rel="preconnect" href="https://fonts.googleapis.com">\n<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n<link href="' + esc(FONTS) + '" rel="stylesheet">\n<script type="application/json" id="store">\n' + jsonIn(s) + '\n</script>\n<style id="css">' + parts.css + '</style>\n</head>\n<body>\n<template id="tpl">' + parts.tpl + '</template>\n<script type="application/json" id="media">' + jsonIn(m) + '</script>\n<script>' + parts.shim + '</script>\n<script id="app">' + parts.js + '</script>\n</body>\n</html>\n';
 }
@@ -71,21 +70,22 @@ function limiter(max, windowMs) {
   };
 }
 
+const ah = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const app = express();
 app.disable("x-powered-by");
 app.set("trust proxy", 1);
 app.use((req, res, next) => { res.set("X-Content-Type-Options", "nosniff"); res.set("Referrer-Policy", "same-origin"); next(); });
 
-app.get("/healthz", (req, res) => res.json({ ok: true, ...db.counts() }));
-app.get("/", (req, res) => { res.set("Cache-Control", "no-store").type("html").send(renderPage()); });
+app.get("/healthz", ah(async (req, res) => res.json({ ok: true, db: db.KIND, ...(await db.counts()) })));
+app.get("/", ah(async (req, res) => { res.set("Cache-Control", "no-store").type("html").send(await renderPage()); }));
 app.get("/admin", (req, res) => res.set("Cache-Control", "no-store").sendFile(path.join(__dirname, "admin.html")));
 
-app.get("/_blob/:id", (req, res) => {
+app.get("/_blob/:id", ah(async (req, res) => {
   if (!/^[A-Za-z0-9_-]{16,64}$/.test(req.params.id)) return res.sendStatus(404);
-  const a = db.getAsset(req.params.id);
+  const a = await db.getAsset(req.params.id);
   if (!a) return res.sendStatus(404);
   res.set("Cache-Control", "public, max-age=31536000, immutable").type(a.mime).send(Buffer.from(a.data));
-});
+}));
 
 /* ---------- API ---------- */
 app.get("/api/me", (req, res) => res.set("Cache-Control", "no-store").json({ admin: isAdmin(req) }));
@@ -104,7 +104,7 @@ app.post("/api/logout", sameOrigin, (req, res) => {
 });
 
 // Luu cua hang (san pham, ma giam gia, thong tin shop, anh bia/logo).
-app.post("/api/publish", sameOrigin, needAdmin, express.json({ limit: "40mb" }), (req, res) => {
+app.post("/api/publish", sameOrigin, needAdmin, express.json({ limit: "40mb" }), ah(async (req, res) => {
   const { baseRev, store, media } = req.body || {};
   if (!store || typeof store !== "object" || !Array.isArray(store.products) || !store.shop || typeof store.shop !== "object")
     return res.status(400).json({ code: "invalid_content" });
@@ -114,29 +114,29 @@ app.post("/api/publish", sameOrigin, needAdmin, express.json({ limit: "40mb" }),
     if (!p || !Number.isInteger(p.id) || p.id <= 0 || ids.has(p.id)) return res.status(400).json({ code: "invalid_content" });
     ids.add(p.id);
   }
-  if (baseRev !== db.currentRev()) return res.status(409).json({ code: "conflict" });
   const m = media && typeof media === "object" ? media : { cover: "", logo0: "", logo: "", p: {} };
-  const rev = db.saveStore(store, m);
+  const rev = await db.saveStore(store, m, baseRev);
+  if (rev === null) return res.status(409).json({ code: "conflict" });
   res.json({ ok: true, rev });
-});
+}));
 
-app.post("/api/assets", sameOrigin, needAdmin, express.raw({ type: ["image/jpeg", "image/png", "image/webp"], limit: "8mb" }), (req, res) => {
+app.post("/api/assets", sameOrigin, needAdmin, express.raw({ type: ["image/jpeg", "image/png", "image/webp"], limit: "8mb" }), ah(async (req, res) => {
   const mime = req.headers["content-type"];
   if (!Buffer.isBuffer(req.body) || !req.body.length || !/^image\/(jpeg|png|webp)$/.test(mime || "")) return res.status(400).json({ code: "invalid_content" });
-  res.json({ id: db.putAsset(req.body, mime) });
-});
-app.get("/api/assets", needAdmin, (req, res) => {
-  const assets = db.listAssets();
+  res.json({ id: await db.putAsset(req.body, mime) });
+}));
+app.get("/api/assets", needAdmin, ah(async (req, res) => {
+  const assets = await db.listAssets();
   res.json({ assets, usage: { files: assets.length, bytes: assets.reduce((n, a) => n + a.bytes, 0) } });
-});
-app.delete("/api/assets/:id", sameOrigin, needAdmin, (req, res) => {
+}));
+app.delete("/api/assets/:id", sameOrigin, needAdmin, ah(async (req, res) => {
   if (!/^[A-Za-z0-9_-]{16,64}$/.test(req.params.id)) return res.sendStatus(404);
-  res.json({ ok: db.delAsset(req.params.id) });
-});
+  res.json({ ok: await db.delAsset(req.params.id) });
+}));
 
 // Khach dat hang
 const str = (v, max) => String(v == null ? "" : v).trim().slice(0, max);
-app.post("/api/orders", sameOrigin, limiter(20, 3600e3), express.json({ limit: "64kb" }), (req, res) => {
+app.post("/api/orders", sameOrigin, limiter(20, 3600e3), express.json({ limit: "64kb" }), ah(async (req, res) => {
   const b = req.body || {};
   const o = {
     code: str(b.code, 20), name: str(b.name, 100), phone: str(b.phone, 10), address: str(b.address, 300),
@@ -148,22 +148,22 @@ app.post("/api/orders", sameOrigin, limiter(20, 3600e3), express.json({ limit: "
   };
   if (!/^FA\d{6}-\d{3}$/.test(o.code) || o.name.length < 2 || !/^0\d{9}$/.test(o.phone) || o.address.length < 10 || !o.items.length)
     return res.status(400).json({ code: "invalid_content" });
-  db.addOrder(o);
+  await db.addOrder(o);
   res.json({ ok: true });
-});
+}));
 const STATUS = ["new", "confirmed", "shipping", "done", "cancelled"];
-app.get("/api/orders", needAdmin, (req, res) => res.set("Cache-Control", "no-store").json({ orders: db.listOrders(), counts: db.counts() }));
-app.patch("/api/orders/:id", sameOrigin, needAdmin, express.json({ limit: "1kb" }), (req, res) => {
+app.get("/api/orders", needAdmin, ah(async (req, res) => res.set("Cache-Control", "no-store").json({ orders: await db.listOrders(), counts: await db.counts() })));
+app.patch("/api/orders/:id", sameOrigin, needAdmin, express.json({ limit: "1kb" }), ah(async (req, res) => {
   const s = req.body && req.body.status;
   if (!STATUS.includes(s)) return res.status(400).json({ code: "invalid_content" });
-  res.json({ ok: db.setOrderStatus(+req.params.id, s) });
-});
-app.delete("/api/orders/:id", sameOrigin, needAdmin, (req, res) => res.json({ ok: db.deleteOrder(+req.params.id) }));
+  res.json({ ok: await db.setOrderStatus(+req.params.id, s) });
+}));
+app.delete("/api/orders/:id", sameOrigin, needAdmin, ah(async (req, res) => res.json({ ok: await db.deleteOrder(+req.params.id) })));
 
 // Tai ban sao luu co so du lieu: JSON gom cua hang + don hang (khong gom anh).
-app.get("/api/backup", needAdmin, (req, res) => {
-  res.set("Content-Disposition", 'attachment; filename="feelia-backup.json"').json({ store: db.getStore(), orders: db.listOrders(100000) });
-});
+app.get("/api/backup", needAdmin, ah(async (req, res) => {
+  res.set("Content-Disposition", 'attachment; filename="feelia-backup.json"').json({ store: await db.getStore(), orders: await db.listOrders(100000) });
+}));
 
 app.use((err, req, res, next) => {
   if (err && err.type === "entity.too.large") return res.status(413).json({ code: "too_large" });
@@ -171,8 +171,10 @@ app.use((err, req, res, next) => {
   res.status(err && err.status ? err.status : 500).json({ code: "upstream_error" });
 });
 
-app.listen(PORT, () => {
-  console.log(`FREE.A chay tai http://localhost:${PORT}  (quan tri: /admin, san pham: /#quan-tri)`);
-  console.log(`DB: ${db.FILE}`);
-  if (!ADMIN_PASSWORD) console.log("Chua dat ADMIN_PASSWORD: dang dung mat khau local mac dinh 'admin123'.");
-});
+db.init().then(() => {
+  app.listen(PORT, () => {
+    console.log(`FREE.A chay tai http://localhost:${PORT}  (quan tri: /admin, san pham: /#quan-tri)`);
+    console.log("DB: " + db.DESC);
+    if (!ADMIN_PASSWORD) console.log("Chua dat ADMIN_PASSWORD: dang dung mat khau local mac dinh 'admin123'.");
+  });
+}).catch((e) => { console.error("Khong khoi tao duoc co so du lieu:", e); process.exit(1); });
