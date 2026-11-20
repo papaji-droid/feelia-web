@@ -120,7 +120,7 @@
 </div>
 <div class="ctl" id="phErase" hidden>
 <label for="phBr">Cỡ cọ<input type="range" id="phBr" min="10" max="90" step="2" value="34"></label>
-<div class="opt"><button class="btn sm2" data-a="pherase">Xóa vùng đã tô</button><button class="btn ghost sm2" data-a="phmaskx">Bỏ vùng tô</button><button class="btn ghost sm2" data-a="phundo" id="phUndo" hidden>Hoàn tác</button></div>
+<div class="opt"><button class="btn sm2" data-a="pherase" id="phEraseB">Xóa chữ trong vùng tô</button><button class="btn ghost sm2" data-a="phmaskx">Bỏ vùng tô</button><button class="btn ghost sm2" data-a="phundo" id="phUndo" hidden>Hoàn tác</button></div>
 </div>
 <div class="opt" style="margin-top:18px"><button class="lnk" data-a="phmain" id="phMain">Đặt làm ảnh chính</button><button class="lnk" data-a="phdel" id="phDel">Bỏ ảnh này</button></div>
 </div>
@@ -134,12 +134,19 @@
 <aside class="sheet" id="wmed" aria-label="Mẫu xóa watermark">
 <div class="sh"><h2>Mẫu xóa watermark</h2><button class="x" data-a="wmclose" aria-label="Đóng">×</button></div>
 <div class="sb" id="wmB">
-<div class="pvw"><canvas id="wmC" width="800" height="1000" aria-label="Ảnh mẫu. Kéo để khoanh chỗ có watermark, chạm vào ô đã khoanh để bỏ."></canvas></div>
-<p class="sm" id="wmS" style="margin:10px 0 0"></p>
-<div class="opt" style="margin-top:10px"><button class="btn ghost sm2" data-a="wmtest" id="wmTest">Xem thử sau khi xóa</button><button class="btn ghost sm2" data-a="wmnext" id="wmNext">Ảnh khác</button><button class="btn ghost sm2" data-a="wmauto">Tự tìm lại</button></div>
-<div class="opt" style="margin-top:6px"><button class="lnk" data-a="wmundo">Bỏ vùng vừa khoanh</button><button class="lnk" data-a="wmclr">Bỏ hết</button></div>
+<div class="pvw"><canvas id="wmC" width="800" height="1000" aria-label="Ảnh mẫu. Chỗ tô đỏ là watermark trang tìm được, đậm nhạt theo độ đục từng điểm."></canvas></div>
+<div class="meter" id="wmBar" hidden><i></i></div>
+<p class="sm" id="wmS" style="margin:10px 0 0" role="status" aria-live="polite"></p>
+<div class="opt" style="margin-top:10px"><button class="btn ghost sm2" data-a="wmtest" id="wmTest">Xem thử sau khi xóa</button><button class="btn ghost sm2" data-a="wmnext" id="wmNext">Ảnh khác</button></div>
+<div class="opt" id="wmTools" style="margin-top:10px" aria-label="Sửa chỗ trang tìm"><button class="o" data-a="wmmode" data-v="view" aria-pressed="true">Chỉ xem</button><button class="o" data-a="wmmode" data-v="add" aria-pressed="false">Tô chỗ bị sót</button><button class="o" data-a="wmmode" data-v="cut" aria-pressed="false">Tô chỗ nhận nhầm</button></div>
+<div class="opt" style="margin-top:6px"><button class="btn sm2" data-a="wmauto" id="wmRe">Tìm lại</button><button class="lnk" data-a="wmclr" id="wmClr" hidden>Bỏ các chỗ đã tô</button></div>
 <div class="f" style="margin-top:14px"><label for="wmName">Tên mẫu, ví dụ tên nhà sỉ<input id="wmName" maxlength="40" placeholder="Xưởng Hà Nội"></label></div>
-<p class="sm mute">Kéo trên ảnh để khoanh thêm chỗ có watermark, chạm vào ô đã khoanh để bỏ ô đó. Khoanh rộng hơn chữ một chút. Bấm Ảnh khác để chắc mẫu đúng với mọi ảnh.</p>
+<details class="hint"><summary>Trang tìm watermark thế nào</summary><ul class="facts">
+<li>Watermark là thứ duy nhất giống hệt nhau trên mọi ảnh của một nhà sỉ. Trang so các ảnh để tính độ đục và màu của watermark ở từng điểm ảnh, nên chỉ xóa đúng nét chữ, logo, bóng đổ, không đụng vào phần áo xung quanh.</li>
+<li>Chỗ watermark mờ: trang tính ngược ra đúng màu ảnh gốc bên dưới. Chỗ watermark đặc (không còn thấy ảnh gốc): trang vẽ lại bằng AI.</li>
+<li>Càng nhiều ảnh càng chính xác. Cần ít nhất 5 ảnh, nên từ 10 ảnh trở lên, cùng một nhà sỉ, cùng khổ ảnh.</li>
+<li>Thấy chỗ tô đỏ bị sót hoặc tô nhầm (ví dụ mép tường studio): chọn Tô chỗ bị sót hoặc Tô chỗ nhận nhầm, tô lên ảnh, rồi bấm Tìm lại.</li>
+<li>Ảnh nào không có watermark của mẫu này thì trang tự nhận ra và để nguyên.</li></ul></details>
 </div>
 <div class="sf two"><button class="btn ghost" data-a="wmclose">Quay lại</button><button class="btn" data-a="wmsave">Lưu mẫu</button></div>
 </aside>

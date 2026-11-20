@@ -22,6 +22,14 @@ run-local.bat            # hoac: npm install && npm start
 
 Goi free: Postgres bi xoa sau 30 ngay (nang goi truoc han hoac tai ban sao luu o `/api/backup`); web service ngu sau 15 phut khong co truy cap, lan mo dau cham ~30 giay.
 
+## Xu ly anh (trang quan tri)
+- `src/imgtools.js`: xoa watermark theo mau nha si (hoc alpha + mau tung diem anh tu nhieu anh, tinh nguoc phep tron),
+  AI ve lai cho watermark dac (MI-GAN, MIT), cat khung 4:5 giu tron nguoi mau (MediaPipe, Apache 2.0). Chi tai khi admin dung.
+- Mo hinh AI tai tu CDN (HuggingFace, Google) lan dau, kiem tra ma bam, luu dem trong trinh duyet. Muon tu luu tru:
+  dat `migan_pipeline_v2.onnx` va `efficientdet_lite0.tflite` vao thu muc `models/` (server phuc vu o `/models/...`).
+- Trang gui header COOP/COEP (credentialless) de AI chay nhieu luong trong trinh duyet.
+- Chi tiet thuat toan va so do chat luong: `docs/quan-tri-web-free-a.md` muc 4b, 4c.
+
 ## Cau truc
 - `server/server.js` API + dung trang tu `src/` + du lieu DB
 - `server/db.js` Postgres/SQLite: san pham, don hang, anh, cau hinh

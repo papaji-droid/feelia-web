@@ -55,8 +55,15 @@ function tidy(d){
   Object.keys(o.shop).forEach(k=>{if(k==="shipFee"||k==="freeShip")o.shop[k]=Math.max(0,Math.round(+o.shop[k]||0));else o.shop[k]=String(o.shop[k]==null?"":o.shop[k])});
   const b=d.brand&&typeof d.brand==="object"?d.brand:{};
   o.brand={st:b.st==="s"?"s":"f",sz:clamp(Math.round(+b.sz||34),18,60)};
-  o.wm=(Array.isArray(d.wm)?d.wm:[]).filter(w=>w&&typeof w==="object"&&Array.isArray(w.r)).slice(0,30).map((w,i)=>({id:String(w.id||"").replace(/[^\w-]/g,"").slice(0,20)||"w"+i,name:String(w.name||"").slice(0,40)||"Nhà sỉ "+(i+1),
-    r:w.r.filter(r=>Array.isArray(r)&&r.length===4&&r.every(v=>isFinite(+v))).slice(0,12).map(r=>{const x=clamp(+r[0],0,1),y=clamp(+r[1],0,1);return[x,y,clamp(+r[2],0,1-x),clamp(+r[3],0,1-y)].map(v=>Math.round(v*1e4)/1e4)}).filter(r=>r[2]>0&&r[3]>0)})).filter(w=>w.r.length);
+  /* mẫu xóa watermark: kiểu mới (v:2) là ảnh mẫu m (màu + độ đục từng điểm) và khung x,y,w,h trên khổ gốc rw×rh;
+     kiểu cũ là danh sách khung chữ nhật r */
+  o.wm=(Array.isArray(d.wm)?d.wm:[]).filter(w=>w&&typeof w==="object").slice(0,30).map((w,i)=>{
+    const id=String(w.id||"").replace(/[^\w-]/g,"").slice(0,20)||"w"+i,name=String(w.name||"").slice(0,40)||"Nhà sỉ "+(i+1);
+    if(w.v===2){const n=k=>Math.max(0,Math.min(20000,Math.round(+w[k]||0)));const t={id,name,v:2,m:String(w.m||""),rw:n("rw"),rh:n("rh"),x:n("x"),y:n("y"),w:n("w"),h:n("h"),n:n("n")};
+      return okRef(t.m)&&t.rw&&t.rh&&t.w&&t.h&&t.x+t.w<=t.rw&&t.y+t.h<=t.rh?t:null}
+    if(!Array.isArray(w.r))return null;
+    const r=w.r.filter(r=>Array.isArray(r)&&r.length===4&&r.every(v=>isFinite(+v))).slice(0,12).map(r=>{const x=clamp(+r[0],0,1),y=clamp(+r[1],0,1);return[x,y,clamp(+r[2],0,1-x),clamp(+r[3],0,1-y)].map(v=>Math.round(v*1e4)/1e4)}).filter(r=>r[2]>0&&r[3]>0);
+    return r.length?{id,name,r}:null}).filter(Boolean);
   o.vouchers=(Array.isArray(d.vouchers)?d.vouchers:[]).filter(v=>v&&typeof v==="object");
   o.vouchers.forEach(v=>{delete v.note;v.code=String(v.code||"").toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,20)});
   o.looks=(Array.isArray(d.looks)?d.looks:[]).filter(l=>l&&Array.isArray(l.ids));
@@ -456,14 +463,33 @@ async function decode(file){
   try{return await createImageBitmap(file)}catch(e){}
   const u=URL.createObjectURL(file);try{return await loadImg(u)}finally{setTimeout(()=>URL.revokeObjectURL(u),3000)}
 }
-async function prepFile(file,W,rects){
-  let b=await decode(file),src=b;
-  if(rects&&rects.length){/* xóa watermark trên ảnh gốc (cạnh dài tối đa 1600 px) trước khi cắt khung */
-    const iw=b.naturalWidth||b.width,ih=b.naturalHeight||b.height,k=Math.min(1,1600/Math.max(iw,ih)),c=W.big||(W.big=cnv(1,1));
-    c.width=Math.max(1,Math.round(iw*k));c.height=Math.max(1,Math.round(ih*k));const g=c2d(c);g.imageSmoothingEnabled=true;g.imageSmoothingQuality="high";g.drawImage(b,0,0,c.width,c.height);
-    if(b.close)b.close();b=null;inpaintRects(c,rects);src=c}
-  const[sx,sy,sw,sh]=cropRect(src),x=W.o.getContext("2d");
-  x.imageSmoothingEnabled=true;x.imageSmoothingQuality="high";x.fillStyle="#fff";x.fillRect(0,0,OW,OH);x.drawImage(src,sx,sy,sw,sh,0,0,OW,OH);if(b&&b.close)b.close();
+/* Công cụ xử lý ảnh nâng cao (src/imgtools.js): xóa watermark chính xác từng điểm, AI vẽ lại, nhận diện người mẫu.
+   Chỉ tải khi chủ shop dùng tới, khách xem trang không phải tải. */
+let IMGP=null;
+function imgTools(){return IMGP||(IMGP=new Promise((ok,no)=>{if(window.FAIMG)return ok(window.FAIMG);
+  const s=document.createElement("script");s.src="/imgtools.js";s.async=true;
+  s.onload=()=>window.FAIMG?ok(window.FAIMG):no({code:"imgtools"});s.onerror=()=>{IMGP=null;s.remove();no({code:"imgtools"})};document.head.appendChild(s)}))}
+const tools=async()=>{try{return await imgTools()}catch(e){return null}};
+/* mẫu watermark kiểu mới: ảnh mẫu (màu và độ đục từng điểm) đọc một lần rồi giữ trong bộ nhớ */
+const WMT=new Map();
+function wmTpl(w){const k=w.id+"|"+w.m;if(WMT.has(k))return WMT.get(k);
+  const p=(async()=>{const F=await imgTools(),im=await loadImg(refUrl(w.m));return F.tplFromImage(im,w)})();WMT.set(k,p);p.catch(()=>WMT.delete(k));return p}
+async function wmApply(F,c,w){
+  if(w.v===2)return F.applyTemplate(c,await wmTpl(w));
+  if(w.r&&w.r.length){const r=await F.applyRects(c,w.r);return{found:!!r.changed,old:true}}
+  return{found:false};
+}
+/* Đọc ảnh, xóa watermark theo mẫu ở độ phân giải gốc (chính xác hơn), rồi cắt khung 4:5 giữ trọn người mẫu.
+   Không tải được công cụ (mất mạng) thì vẫn cắt khung theo cách cũ để không chặn việc nhập hàng. */
+async function prepFile(file,W,wm){
+  const b=await decode(file),iw=b.naturalWidth||b.width,ih=b.naturalHeight||b.height,k=Math.min(1,3200/Math.max(iw,ih));
+  const c=cnv(Math.max(1,Math.round(iw*k)),Math.max(1,Math.round(ih*k))),g=c2d(c);g.imageSmoothingEnabled=true;g.imageSmoothingQuality="high";g.drawImage(b,0,0,c.width,c.height);if(b.close)b.close();
+  const F=await tools(),info={wm:null,plan:null};
+  if(wm&&F){try{info.wm=await wmApply(F,c,wm)}catch(e){info.wm={found:false,err:true}}}
+  if(F){try{info.plan=F.cropPlan(c.width,c.height,await F.people(c))}catch(e){info.plan=null}}
+  if(info.plan)await F.drawPlan(c,W.o,info.plan);
+  else{const[sx,sy,sw,sh]=cropRect(c),x=W.o.getContext("2d");x.imageSmoothingEnabled=true;x.imageSmoothingQuality="high";x.fillStyle="#fff";x.fillRect(0,0,OW,OH);x.drawImage(c,sx,sy,sw,sh,0,0,OW,OH)}
+  return info;
 }
 function domColor(A){
   const r=[],g=[],b=[];for(let i=0;i<A.M0.length;i++)if(A.M0[i]){r.push(A.R[i]);g.push(A.G[i]);b.push(A.B[i])}
@@ -472,104 +498,6 @@ function domColor(A){
   let bn="Màu 1",bd=1e9;NAMED.forEach(([n,hx])=>{const qq=[1,3,5].map(i=>parseInt(hx.slice(i,i+2),16)/255),dd=Math.hypot(qq[0]-c[0],qq[1]-c[1],qq[2]-c[2]);if(dd<bd){bd=dd;bn=n}});
   return[bn,h];
 }
-/* ---------- xóa chữ và watermark ----------
-   Mỗi mảng cần xóa được lấp riêng. Nền có hoa văn: chép mảng nền giống nhất ngay cạnh rồi hòa màu viền cho liền.
-   Nền trơn hoặc chuyển màu: nội suy mịn từ viền vào trong rồi rắc chút hạt cho giống ảnh chụp. */
-function regions(need,W,H){
-  const lab=new Int32Array(W*H),out=[],st=[];let n=0;
-  for(let i=0;i<W*H;i++){if(!need[i]||lab[i])continue;n++;let x0=W,y0=H,x1=-1,y1=-1;st.push(i);lab[i]=n;
-    while(st.length){const j=st.pop(),x=j%W,y=(j-x)/W;if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;
-      if(x>0&&need[j-1]&&!lab[j-1]){lab[j-1]=n;st.push(j-1)}if(x<W-1&&need[j+1]&&!lab[j+1]){lab[j+1]=n;st.push(j+1)}
-      if(y>0&&need[j-W]&&!lab[j-W]){lab[j-W]=n;st.push(j-W)}if(y<H-1&&need[j+W]&&!lab[j+W]){lab[j+W]=n;st.push(j+W)}}
-    out.push({n,b:[x0,y0,x1,y1]})}
-  return{lab,out};
-}
-/* màng mịn: điền các ô chưa biết (M=1) trong khung lw×lh từ viền vào, rồi làm mịn nhiều lượt */
-function membrane(F,M,lw,lh){
-  const K=M.slice(),q=[];let left=0;for(let i=0;i<M.length;i++)left+=M[i];
-  while(left>0){q.length=0;
-    for(let y=0;y<lh;y++)for(let x=0;x<lw;x++){const i=y*lw+x;if(!K[i])continue;let r=0,g=0,b=0,n=0;
-      for(let dy=-1;dy<2;dy++)for(let dx=-1;dx<2;dx++){if(!dx&&!dy)continue;const a=x+dx,c=y+dy;if(a<0||c<0||a>=lw||c>=lh)continue;const j=c*lw+a;if(K[j])continue;const w=dx&&dy?.7:1;r+=F[j*3]*w;g+=F[j*3+1]*w;b+=F[j*3+2]*w;n+=w}
-      if(n)q.push(i,r/n,g/n,b/n)}
-    if(!q.length)break;for(let k=0;k<q.length;k+=4){const i=q[k];F[i*3]=q[k+1];F[i*3+1]=q[k+2];F[i*3+2]=q[k+3];K[i]=0;left--}}
-  const it=Math.min(120,20+Math.max(lw,lh));
-  for(let t=0;t<it;t++)for(let y=0;y<lh;y++)for(let x=0;x<lw;x++){const i=y*lw+x;if(!M[i])continue;
-    for(let c=0;c<3;c++){let s=0,n=0;if(x>0){s+=F[(i-1)*3+c];n++}if(x<lw-1){s+=F[(i+1)*3+c];n++}if(y>0){s+=F[(i-lw)*3+c];n++}if(y<lh-1){s+=F[(i+lw)*3+c];n++}F[i*3+c]=s/n}}
-}
-function fillRegion(d,W,H,lab,R){
-  const id=R.n,[x0,y0,x1,y1]=R.b,P=6,bx0=Math.max(0,x0-P),by0=Math.max(0,y0-P),bx1=Math.min(W-1,x1+P),by1=Math.min(H-1,y1+P),lw=bx1-bx0+1,lh=by1-by0+1;
-  const ring=[];for(let y=by0;y<=by1;y++)for(let x=bx0;x<=bx1;x++){const i=y*W+x;if(!lab[i])ring.push(i)}
-  if(!ring.length)return;
-  let tex=0,tn=0;for(const i of ring){if(i%W<W-1&&!lab[i+1]){tex+=Math.abs(d[i*4+1]-d[i*4+5]);tn++}}tex=tn?tex/tn:0;
-  const M=new Uint8Array(lw*lh),F=new Float32Array(lw*lh*3);
-  for(let y=0;y<lh;y++)for(let x=0;x<lw;x++){const i=(by0+y)*W+bx0+x;if(lab[i]===id)M[y*lw+x]=1}
-  /* tìm mảng nguồn sạch ở cạnh, giống viền nhất; không có chỗ nào sạch thì nội suy mịn */
-  {const bw=x1-x0+1,bh=y1-y0+1;let best=null;
-    for(const k of[1,1.3,1.7,2.2])for(const[ux,uy]of[[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]]){
-      const dx=Math.round(ux*(bw+P+2)*k),dy=Math.round(uy*(bh+P+2)*k);
-      if(bx0+dx<0||by0+dy<0||bx1+dx>=W||by1+dy>=H)continue;
-      let bad=false;for(let y=by0;y<=by1&&!bad;y+=2)for(let x=bx0;x<=bx1;x+=2)if(lab[(y+dy)*W+x+dx]){bad=true;break}
-      if(bad)continue;const o=dy*W+dx,s=[0,0,0];
-      for(const i of ring)for(let c=0;c<3;c++)s[c]+=d[i*4+c]-d[(i+o)*4+c];for(let c=0;c<3;c++)s[c]/=ring.length;
-      let e=0;for(const i of ring)for(let c=0;c<3;c++)e+=Math.abs(d[i*4+c]-d[(i+o)*4+c]-s[c]);e=e/ring.length/3+Math.hypot(s[0],s[1],s[2])*.05;
-      if(!best||e<best.e)best={e,o,s:s.slice()}}
-    if(best){const o=best.o;
-      /* chênh lệch màu ở viền (giới hạn để không loang vệt sáng) được hòa dần vào trong cho liền */
-      for(let y=0;y<lh;y++)for(let x=0;x<lw;x++){const k=y*lw+x;if(M[k])continue;const i=(by0+y)*W+bx0+x;for(let c=0;c<3;c++)F[k*3+c]=best.s[c]+clamp(d[i*4+c]-d[(i+o)*4+c]-best.s[c],-14,14)}
-      membrane(F,M,lw,lh);
-      for(let y=0;y<lh;y++)for(let x=0;x<lw;x++){const k=y*lw+x;if(!M[k])continue;const i=(by0+y)*W+bx0+x;for(let c=0;c<3;c++)d[i*4+c]=clamp(d[(i+o)*4+c]+F[k*3+c],0,255)}
-      return}
-  }
-  for(let y=0;y<lh;y++)for(let x=0;x<lw;x++){const k=y*lw+x;if(M[k])continue;const i=(by0+y)*W+bx0+x;for(let c=0;c<3;c++)F[k*3+c]=d[i*4+c]}
-  membrane(F,M,lw,lh);
-  const sd=Math.min(6,tex*.7);let seed=(x0*73856093^y0*19349663)&0x7fffffff||7;
-  for(let y=0;y<lh;y++)for(let x=0;x<lw;x++){const k=y*lw+x;if(!M[k])continue;const i=(by0+y)*W+bx0+x;let nz=0;if(sd>.4){seed=(seed*1103515245+12345)&0x7fffffff;nz=((seed/0x7fffffff)-.5)*2*sd}
-    for(let c=0;c<3;c++)d[i*4+c]=clamp(F[k*3+c]+nz,0,255)}
-}
-function inpaintNeed(cv,need){
-  const W=cv.width,H=cv.height,x=c2d(cv),{lab,out}=regions(need,W,H);if(!out.length)return false;
-  const im=x.getImageData(0,0,W,H);out.forEach(R=>fillRegion(im.data,W,H,lab,R));x.putImageData(im,0,0);return true;
-}
-/* xóa vùng tô tay trong khung chỉnh ảnh */
-function inpaint(cv,mk){
-  const W=cv.width,H=cv.height,m=c2d(mk).getImageData(0,0,W,H).data;let need=new Uint8Array(W*H),any=false;
-  for(let i=0;i<W*H;i++)if(m[i*4+3]>16){need[i]=1;any=true}
-  if(!any)return false;
-  for(let g=0;g<2;g++){const n2=need.slice();for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++){const i=y*W+x;if(!need[i]&&(need[i-1]||need[i+1]||need[i-W]||need[i+W]))n2[i]=1}need=n2}
-  return inpaintNeed(cv,need);
-}
-/* xóa theo mẫu: các ô [x,y,w,h] tính theo tỉ lệ khung ảnh gốc */
-function inpaintRects(cv,rects){
-  if(!rects||!rects.length)return false;const W=cv.width,H=cv.height,need=new Uint8Array(W*H),pd=Math.max(2,Math.round(W/400));
-  rects.forEach(r=>{const x0=Math.max(0,Math.floor(r[0]*W)-pd),y0=Math.max(0,Math.floor(r[1]*H)-pd),x1=Math.min(W-1,Math.ceil((r[0]+r[2])*W)+pd),y1=Math.min(H-1,Math.ceil((r[1]+r[3])*H)+pd);
-    for(let y=y0;y<=y1;y++)need.fill(1,y*W+x0,y*W+x1+1)});
-  return inpaintNeed(cv,need);
-}
-/* tự tìm watermark: so nhiều ảnh cùng nhà sỉ, nét nào lặp lại đúng một chỗ trên hầu hết các ảnh là watermark */
-async function wmFind(files){
-  const GW=240;let GH=0,ar=0;const E=[];
-  for(const f of files){let b;try{b=await decode(f)}catch(e){continue}
-    const iw=b.naturalWidth||b.width,ih=b.naturalHeight||b.height,a=iw/ih;
-    if(!ar){ar=a;GH=Math.max(60,Math.round(GW/a))}
-    if(Math.abs(a-ar)/ar>.03){if(b.close)b.close();continue}
-    const c=cnv(GW,GH),x=c2d(c);x.imageSmoothingQuality="high";x.drawImage(b,0,0,GW,GH);if(b.close)b.close();
-    const p=x.getImageData(0,0,GW,GH).data,L=new Float32Array(GW*GH),g=new Float32Array(GW*GH);
-    for(let i=0;i<L.length;i++)L[i]=.3*p[i*4]+.59*p[i*4+1]+.11*p[i*4+2];
-    for(let y=1;y<GH-1;y++)for(let xx=1;xx<GW-1;xx++){const i=y*GW+xx,gx=2*(L[i+1]-L[i-1])+L[i-GW+1]-L[i-GW-1]+L[i+GW+1]-L[i+GW-1],gy=2*(L[i+GW]-L[i-GW])+L[i+GW-1]-L[i-GW-1]+L[i+GW+1]-L[i-GW+1];g[i]=Math.hypot(gx,gy)/4}
-    E.push(g);if(E.length>=16)break}
-  const N=E.length;if(N<3)return{n:N,rects:[]};
-  const q=new Float32Array(GW*GH),t=new Float32Array(N),k=Math.floor((N-1)*.12);
-  for(let i=0;i<q.length;i++){for(let n=0;n<N;n++)t[n]=E[n][i];t.sort();q[i]=t[k]}
-  let m=new Uint8Array(GW*GH);for(let i=0;i<q.length;i++)if(q[i]>9)m[i]=1;
-  for(let r=0;r<2;r++){const m2=m.slice();for(let y=1;y<GH-1;y++)for(let x=1;x<GW-1;x++){const i=y*GW+x;if(!m[i]&&(m[i-1]||m[i+1]||m[i-GW]||m[i+GW]))m2[i]=1}m=m2}
-  const{out}=regions(m,GW,GH);let bx=out.map(R=>R.b).filter(b=>(b[2]-b[0]+1)*(b[3]-b[1]+1)>=24);
-  for(let ch=true;ch;){ch=false;for(let i=0;i<bx.length&&!ch;i++)for(let j=i+1;j<bx.length;j++){const a=bx[i],b=bx[j];
-    if(a[0]<=b[2]+4&&b[0]<=a[2]+4&&a[1]<=b[3]+3&&b[1]<=a[3]+3){bx[i]=[Math.min(a[0],b[0]),Math.min(a[1],b[1]),Math.max(a[2],b[2]),Math.max(a[3],b[3])];bx.splice(j,1);ch=true;break}}}
-  const rects=bx.map(b=>{const x0=Math.max(0,b[0]-1),y0=Math.max(0,b[1]-1),x1=Math.min(GW,b[2]+2),y1=Math.min(GH,b[3]+2);return[x0/GW,y0/GH,(x1-x0)/GW,(y1-y0)/GH]})
-    .filter(r=>r[2]*r[3]<.3&&r[2]<.95&&r[3]<.95).sort((a,b)=>b[2]*b[3]-a[2]*a[3]).slice(0,12).map(r=>r.map(v=>Math.round(v*1e4)/1e4));
-  return{n:N,rects};
-}
-
 /* kho ảnh của trang; không có thì nhúng ảnh vào trang */
 let AS=null,asTried=false;
 async function assets(){if(!asTried){asTried=true;AS=await use("assets")}return AS}
@@ -579,11 +507,17 @@ async function putImg(blob){
     catch(e){const c=e&&e.code;if((c==="rate_limited"&&tries<2)||(c==="store_unavailable"&&tries<1)){tries++;await sleep(c==="rate_limited"?4000*tries:1500);continue}throw e}}}
   const u=await blobToData(blob),k="m"+Date.now().toString(36)+Math.random().toString(36).slice(2,7);MEDIA.p[k]=u;mTouched=true;return"d:"+k;
 }
-async function processFile(file,W,rects){
-  await logoReady();await prepFile(file,W,rects);
+/* ảnh PNG (mẫu watermark): lưu kho ảnh, không có kho thì nhúng vào trang */
+async function putPng(blob){
+  const a=await assets();
+  if(a){const r=await a.upload(blob,{type:"image/png"});if(!r||!/^[A-Za-z0-9_-]{16,64}$/.test(r.id))throw{code:"upstream_error"};return"a:"+r.id}
+  const u=await blobToData(blob),k="w"+Date.now().toString(36)+Math.random().toString(36).slice(2,7);MEDIA.p[k]=u;mTouched=true;return"d:"+k;
+}
+async function processFile(file,W,wm){
+  await logoReady();const info=await prepFile(file,W,wm);
   const A=analyze(W.o),m=suggest(A,DB.brand.st,DB.brand.sz)[0];stampTo(W.o,m,W.s);
   const[ob,sb]=await Promise.all([toBlob(W.o,.9),toBlob(W.s,.85)]),[o,s]=await Promise.all([putImg(ob),putImg(sb)]);
-  return{ph:{s,o,m},color:domColor(A)};
+  return{ph:{s,o,m},color:domColor(A),info};
 }
 async function restampOne(ph,W){
   await logoReady();const im=await loadImg(refUrl(ph.o));W.o.getContext("2d").drawImage(im,0,0,OW,OH);
@@ -596,7 +530,7 @@ const workCanvas=()=>({o:cnv(OW,OH),s:cnv(OW,OH)});
 const ERRMSG={quota_or_state:"Kho ảnh đã đầy hoặc tạm khóa.",too_large:"Ảnh quá nặng.",unsupported_type:"File này không phải ảnh dùng được.",rate_limited:"Tải ảnh lên quá nhanh, hãy chờ một lát.",upstream_auth:"Phiên đăng nhập hết hạn, hãy tải lại trang.",not_granted:"Tài khoản này chưa được lưu ảnh.",load:"Không mở được ảnh.",nologo:"Chưa có logo."};
 const errText=e=>ERRMSG[e&&e.code]||"Có lỗi khi xử lý ảnh ("+((e&&e.code)||"không rõ")+").";
 
-/* việc hàng loạt: 3 ảnh xử lý song song, có thể dừng giữa chừng */
+/* việc hàng loạt: vài ảnh xử lý song song (mặc định 3), có thể dừng giữa chừng */
 let JOB=null;
 function jobUI(){
   const j=$("#job");j.hidden=!JOB;if(!JOB)return;
@@ -605,12 +539,12 @@ function jobUI(){
   $("#jobS").textContent=JOB.end?"":JOB.done?`Còn khoảng ${Math.max(1,Math.round(sec/JOB.done*(JOB.total-JOB.done)))} giây`:"Đang bắt đầu…";
   $("#jobBar").style.width=pc+"%";$("#jobStop").hidden=JOB.end||JOB.stop;$("#jobOk").hidden=!JOB.end;
 }
-async function runJob(label,items,fn,after){
+async function runJob(label,items,fn,after,conc){
   if(JOB&&!JOB.end)return toast("Đang có việc chạy, chờ xong đã");
   try{await logoReady()}catch(e){return toast(errText(e))}
   JOB={label,total:items.length,done:0,fail:0,stop:false,end:false,t0:performance.now(),err:null};jobUI();
   let next=0;const J=JOB;
-  await Promise.all(Array.from({length:Math.min(3,items.length)},async()=>{const W=workCanvas();
+  await Promise.all(Array.from({length:Math.min(conc||3,items.length)},async()=>{const W=workCanvas();
     while(!J.stop){const k=next++;if(k>=items.length)break;
       try{await fn(items[k],W,k)}catch(e){J.fail++;J.err=e;if(e&&["quota_or_state","upstream_auth","not_granted"].includes(e.code))J.stop=true}
       J.done++;jobUI()}}));
@@ -730,8 +664,10 @@ function updImp(){
   const ts=$("#impTs");ts.className="sm "+(I.err?"bad":"mute");$("#impTx").hidden=!T&&!I.err;
   ts.textContent=I.err||(T?`Đọc được ${T.rows.length} dòng${I.tname?" từ "+I.tname:""}. Cột: ${T.cols.map(c=>COLN[c]).join(", ")}.`:"Cột nên có: Mã, Tên, Giá, Giá giảm, Size, Màu, Danh mục, Ảnh. Không có bảng thì trang đọc giá ghi trong tên file hoặc tên thư mục.");
   if(I.wm&&!wmById(I.wm))I.wm="";const sel=$("#impWm"),wmo=wmById(I.wm);
-  sel.innerHTML='<option value="">Không xóa watermark</option>'+DB.wm.map(w=>`<option value="${esc(w.id)}">${esc(w.name)} (${w.r.length} vùng)</option>`).join("");sel.value=I.wm;$("#impWmE").hidden=!wmo;
-  $("#impWs").textContent=wmo?`Mọi ảnh sẽ được xóa ${wmo.r.length} vùng theo mẫu "${wmo.name}" trước khi gán logo. Chỉ dùng mẫu này cho ảnh của đúng nhà sỉ đó.`:"Ảnh của cùng một nhà sỉ thường có watermark ở cùng một chỗ. Chọn ảnh của một nhà sỉ ở mục 1, bấm Tạo mẫu: trang tự so các ảnh để tìm watermark, bạn xem lại rồi lưu. Lần sau chỉ cần chọn mẫu.";
+  sel.innerHTML='<option value="">Không xóa watermark</option>'+DB.wm.map(w=>`<option value="${esc(w.id)}">${esc(w.name)} (${esc(wmDesc(w))})</option>`).join("");sel.value=I.wm;$("#impWmE").hidden=!wmo;
+  $("#impWs").textContent=wmo?(wmo.v===2?`Trước khi gán logo, trang xóa đúng từng điểm của watermark "${wmo.name}": chỗ mờ được tính ngược ra màu ảnh gốc, chỗ đặc do AI vẽ lại. Ảnh nào không có watermark này thì để nguyên. Chỉ dùng mẫu cho ảnh của đúng nhà sỉ đó.`
+    :`"${wmo.name}" là mẫu cũ dạng khung chữ nhật: trang chỉ dò nét chữ trong từng khung, kém chính xác hơn. Nên bấm Sửa mẫu này để trang học lại chính xác từ các ảnh đã chọn.`)
+    :"Ảnh của cùng một nhà sỉ thường có cùng một watermark. Chọn từ 10 ảnh của một nhà sỉ ở mục 1, bấm Tạo mẫu: trang so các ảnh để tìm chính xác từng điểm watermark, bạn xem lại rồi lưu. Lần sau chỉ cần chọn mẫu.";
   impThumbs();const pl=I.plan=nF?planImport():null,w=$("#impPrev");
   if(!pl){w.innerHTML="";$("#impF").innerHTML='<button class="btn ghost wide" data-a="close">Đóng</button>';return}
   const warn=[];
@@ -748,10 +684,16 @@ function updImp(){
   $("#impF").innerHTML=pl.groups.length?`<button class="btn wide" data-a="impgo">${wmo?"Xóa watermark, gán logo":"Gán logo"}, ${[pl.nNew?`tạo ${pl.nNew} sản phẩm`:"",pl.nUpd?`cập nhật ${pl.nUpd} sản phẩm`:""].filter(Boolean).join(", ")}</button>`:'<button class="btn ghost wide" data-a="close">Đóng</button>';
 }
 async function impGo(){
-  const pl=IMP&&IMP.plan;if(!pl||!pl.groups.length)return;const wm=wmById(IMP.wm),rects=wm?wm.r:null;closeAll();
+  const pl=IMP&&IMP.plan;if(!pl||!pl.groups.length)return;const wm=wmById(IMP.wm)||null;closeAll();
   const tasks=[];pl.groups.forEach((g,gi)=>g.items.forEach((it,pi)=>tasks.push([gi,pi,it.f])));
-  const res=pl.groups.map(()=>[]),dom=[];
-  await runJob(rects?"Đang xóa watermark và gán logo":"Đang gán logo cho ảnh",tasks,async([gi,pi,f],W)=>{const r=await processFile(f,W,rects);res[gi][pi]=r.ph;if(pi===0)dom[gi]=r.color},ok=>{
+  const res=pl.groups.map(()=>[]),dom=[];let wHit=0,wMiss=0,wErr=0,wAi=0,nPeople=0,nPad=0;
+  /* nạp sẵn công cụ, mẫu, AI và bộ nhận diện người trước khi chạy song song */
+  const F=await tools();
+  if(F){F.detector();if(wm){if(wm.v===2){try{await wmTpl(wm)}catch(e){}}F.aiSession()}}
+  else if(wm)toast("Chưa tải được công cụ xóa watermark (kiểm tra mạng). Ảnh vẫn được gán logo nhưng chưa xóa watermark.");
+  await runJob(wm?"Đang xóa watermark và gán logo":"Đang gán logo cho ảnh",tasks,async([gi,pi,f],W)=>{const r=await processFile(f,W,wm);res[gi][pi]=r.ph;if(pi===0)dom[gi]=r.color;
+      const i=r.info||{};if(wm){if(i.wm&&i.wm.err)wErr++;else if(i.wm&&i.wm.found){wHit++;if(i.wm.how==="ai")wAi++}else wMiss++}
+      if(i.plan){nPeople++;if(i.plan.pl+i.plan.pr>1)nPad++}},ok=>{
     let id=Math.max(0,...PRODUCTS.map(p=>p.id)),nNew=0,nUpd=0,nHid=0;const fresh=[];
     pl.groups.forEach((g,gi)=>{
       const phs=res[gi].filter(Boolean),f=g.info,r=f.r;if(!phs.length&&!g.ex)return;
@@ -763,7 +705,9 @@ async function impGo(){
       const c=(r&&r.cat)||guessCat(f.name),p={id:++id,name:f.name.slice(0,80),cat:c,shape:c==="Áo"?"top":c==="Quần"?"pants":c==="Chân váy"?"skirt":c==="Set"?"set":"dress",price:f.price||0,sizes:szs&&szs.length?szs:["S","M","L"],colors:cols&&cols.length?cols:[dom[gi]||["Màu 1","#b9a58f"]],mat:r&&r.mat||"",desc:r&&r.desc||"",photos:phs};
       if(f.sku)p.sku=f.sku;if(f.sale)p.sale=f.sale;if(!(p.price>0)){p.hidden=true;nHid++}fresh.push(p);nNew++});
     PRODUCTS.unshift(...fresh);
-    return `Đã tạo ${nNew} sản phẩm${nUpd?`, cập nhật ${nUpd} sản phẩm`:""} từ ${ok} ảnh.${nHid?` ${nHid} món chưa có giá đang để ẩn.`:""} Xem lại rồi bấm Lưu để khách thấy.`});
+    const wmTxt=wm?` Watermark: đã xóa trên ${wHit} ảnh${wAi?` (${wAi} ảnh có phần đặc do AI vẽ lại)`:""}${wMiss?`, ${wMiss} ảnh không thấy watermark của mẫu này nên để nguyên`:""}${wErr?`, ${wErr} ảnh lỗi khi xóa`:""}.`:"";
+    const cropTxt=nPeople?` Cắt khung giữ trọn người mẫu ở ${nPeople} ảnh${nPad?` (${nPad} ảnh được nới nền hai bên để không cắt mất người)`:""}.`:"";
+    return `Đã tạo ${nNew} sản phẩm${nUpd?`, cập nhật ${nUpd} sản phẩm`:""} từ ${ok} ảnh.${nHid?` ${nHid} món chưa có giá đang để ẩn.`:""}${wmTxt}${cropTxt} Xem lại rồi bấm Lưu để khách thấy.`},wm?2:3);
 }
 async function restampAll(){
   const items=[];PRODUCTS.forEach(p=>(p.photos||[]).forEach((ph,i)=>items.push([p.id,i])));
@@ -791,7 +735,9 @@ function prune(){
   const okP=r=>r[0]!=="d"||MEDIA.p[r.slice(2)];
   DB.vouchers=DB.vouchers.filter(v=>v.code);
   DB.products.forEach(p=>{if(p.img&&!MEDIA.p[p.img])delete p.img;if(p.photos){p.photos=p.photos.filter(x=>okP(x.s)).map(x=>okP(x.o)?x:Object.assign({},x,{o:x.s}));if(!p.photos.length)delete p.photos}});
+  DB.wm=DB.wm.filter(w=>!w.m||okP(w.m));
   const used=new Set();DB.products.forEach(p=>{if(p.img)used.add(p.img);(p.photos||[]).forEach(x=>[x.s,x.o].forEach(r=>{if(r[0]==="d")used.add(r.slice(2))}))});
+  DB.wm.forEach(w=>{if(w.m&&w.m[0]==="d")used.add(w.m.slice(2))});
   Object.keys(MEDIA.p).forEach(k=>{if(!used.has(k))delete MEDIA.p[k]});
 }
 
@@ -874,12 +820,13 @@ function admShop(){
   <p class="opt" style="margin-top:12px"><label class="btn ghost sm2" for="logoFile">Đổi logo</label>${MEDIA.logo?'<button class="btn ghost sm2" data-a="logoreset">Dùng logo gốc</button>':""}<button class="btn sm2" data-a="restamp"${nph?"":" disabled"}>Gán lại logo cho ${nph} ảnh</button></p>
   <p class="sm mute">Đổi kiểu, cỡ hoặc logo chỉ áp dụng cho ảnh mới. Bấm Gán lại để áp dụng cho ảnh đã có. Logo nên là file PNG nền trong suốt.</p>
   <h2 class="asec">Mẫu xóa watermark</h2><p class="sub">Mỗi nhà sỉ một mẫu. Tạo và chọn mẫu trong Nhập hàng loạt.</p>
-  ${DB.wm.length?DB.wm.map((w,i)=>`<div class="vrow wmrow"><span><b>${esc(w.name)}</b> <span class="mute sm">${w.r.length} vùng</span></span><button class="lnk" data-a="wmdel" data-i="${i}">Xóa mẫu</button></div>`).join(""):'<p class="sm mute">Chưa có mẫu nào.</p>'}
+  ${DB.wm.length?DB.wm.map((w,i)=>`<div class="vrow wmrow"><span><b>${esc(w.name)}</b> <span class="mute sm">${esc(wmDesc(w))}</span></span><button class="lnk" data-a="wmdel" data-i="${i}">Xóa mẫu</button></div>`).join(""):'<p class="sm mute">Chưa có mẫu nào.</p>'}
   <h2 class="asec">Kho ảnh</h2><p class="sm" id="stInfo">Đang kiểm tra…</p><p><button class="btn ghost sm2" data-a="clean" id="cleanB" hidden></button></p>
   <h2 class="asec">Ảnh bìa</h2><div class="covprev">${MEDIA.cover?`<img src="${MEDIA.cover}" alt="Ảnh bìa hiện tại">`:""}</div><p style="margin-top:10px"><label class="btn ghost sm2" for="covFile">Đổi ảnh bìa</label></p><p class="sm mute">Ảnh ngang, rộng từ 1400 px trở lên là đẹp nhất.</p>
   <h2 class="asec">Sao lưu</h2><p class="sm mute">Sao chép toàn bộ dữ liệu cửa hàng, không gồm ảnh, để lưu lại.</p><button class="btn ghost sm2" data-a="copydata">Sao chép dữ liệu</button><textarea class="out" id="dataOut" hidden readonly aria-label="Dữ liệu cửa hàng"></textarea>`;
 }
-function refsIn(db){const s=new Set();(db.products||[]).forEach(p=>(p.photos||[]).forEach(x=>[x.s,x.o].forEach(r=>{if(typeof r==="string"&&r[0]==="a")s.add(r.slice(2))})));return s}
+function refsIn(db){const s=new Set();(db.products||[]).forEach(p=>(p.photos||[]).forEach(x=>[x.s,x.o].forEach(r=>{if(typeof r==="string"&&r[0]==="a")s.add(r.slice(2))})));
+  (db.wm||[]).forEach(w=>{if(typeof w.m==="string"&&w.m[0]==="a")s.add(w.m.slice(2))});return s}
 async function storage(){
   const el=$("#stInfo");if(!el)return;const a=await assets();
   if(!a){el.textContent="Kho ảnh chưa mở được, ảnh mới sẽ được nhúng thẳng vào trang (tối đa khoảng 60 ảnh).";return}
@@ -950,7 +897,7 @@ const reqDraw=()=>{if(pvq)return;pvq=requestAnimationFrame(()=>{pvq=0;phDraw()})
 function phUI(){
   if(!PE)return;const er=PE.mode==="erase";
   $$("#phMode .o").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===PE.mode));$("#phMove").hidden=er;$("#phErase").hidden=!er;
-  $("#phHint").textContent=er?"Tô lên chữ cần xóa, rồi bấm Xóa vùng đã tô. Hợp nhất với chữ nằm trên nền trơn.":"Chạm hoặc kéo trên ảnh để đặt logo.";
+  $("#phHint").textContent=er?"Tô phủ lên chữ cần xóa (tô rộng hơn chữ một chút cũng được), rồi bấm Xóa chữ trong vùng tô. Trang tự dò đúng nét chữ, phần nền trong vùng tô giữ nguyên. Ảnh của nhà sỉ có nhiều ảnh thì dùng mẫu xóa watermark khi nhập hàng loạt sẽ chính xác hơn.":"Chạm hoặc kéo trên ảnh để đặt logo.";
   $("#phVar").innerHTML=["","o","l","d"].map(v=>`<button class="o" data-a="phvar" data-v="${v}" aria-pressed="${(PE.m.vm||"")===v}">${VNAME[v]}</button>`).join("");
   $("#phSz").value=Math.round(PE.m.w*100);$("#phUndo").hidden=!PE.undo;$("#phMain").hidden=!PE.i;$("#phDel").textContent=PE.del?"Bấm lần nữa để bỏ ảnh":"Bỏ ảnh này";
   $("#phDone").textContent="Xong";$("#phDone").disabled=false;
@@ -1035,9 +982,19 @@ const ACT={
   phmode(d){if(!PE||!PE.o)return;PE.mode=d.v;phUI()},
   phvar(d){if(!PE||!PE.o)return;PE.m.vm=d.v;if(!d.v)fixVariant(PE.A,PE.m);PE.mc=true;phUI();phDraw()},
   phalt(){if(!PE||!PE.o||!PE.alts.length)return;PE.ai=(PE.ai+1)%PE.alts.length;const a=PE.alts[PE.ai];PE.m=Object.assign({},a,{vm:PE.m.vm});PE.mc=true;phUI();phDraw()},
-  pherase(){if(!PE||!PE.o)return;if(!PE.masked)return toast("Tô lên chữ cần xóa trước");const u=cnv(OW,OH);u.getContext("2d").drawImage(PE.o,0,0);PE.undo=u;
-    inpaint(PE.o,PE.mask);PE.mask.getContext("2d").clearRect(0,0,OW,OH);PE.masked=false;PE.oc=true;PE.A=analyze(PE.o);
-    if(PE.m.a){PE.alts=suggest(PE.A,PE.m.st,Math.round(PE.m.w*100));PE.m=Object.assign({},PE.alts[0],{vm:PE.m.vm});PE.ai=0}else fixVariant(PE.A,PE.m);PE.mc=true;phUI();phDraw();toast("Đã xóa vùng đã tô")},
+  /* xóa chữ trong vùng tô: trang dò đúng nét chữ trong vùng (không xóa cả vùng), tính ngược hoặc để AI vẽ lại đúng các nét đó */
+  async pherase(){if(!PE||!PE.o||PE.busy)return;if(!PE.masked)return toast("Tô lên chữ cần xóa trước");
+    const P0=PE,b=$("#phEraseB");P0.busy=true;b.disabled=true;b.textContent="Đang xóa…";
+    const F=await tools();
+    if(!F||PE!==P0){P0.busy=false;b.disabled=false;b.textContent="Xóa chữ trong vùng tô";if(!F)toast("Chưa tải được công cụ xóa chữ. Kiểm tra mạng rồi thử lại.");return}
+    const u=cnv(OW,OH);u.getContext("2d").drawImage(P0.o,0,0);
+    const md=c2d(P0.mask).getImageData(0,0,OW,OH).data,br=new Uint8Array(OW*OH);for(let i=0;i<br.length;i++)br[i]=md[i*4+3]>16?1:0;
+    let r=null;try{r=await F.removeBrush(P0.o,br)}catch(e){r=null}
+    P0.busy=false;b.disabled=false;b.textContent="Xóa chữ trong vùng tô";if(PE!==P0)return;
+    if(!r||!r.changed){toast(r?"Không thấy nét chữ nào khác nền trong vùng tô. Tô sát chữ hơn rồi thử lại.":"Có lỗi khi xóa, thử lại.");return}
+    P0.undo=u;P0.mask.getContext("2d").clearRect(0,0,OW,OH);P0.masked=false;P0.oc=true;P0.A=analyze(P0.o);
+    if(P0.m.a){P0.alts=suggest(P0.A,P0.m.st,Math.round(P0.m.w*100));P0.m=Object.assign({},P0.alts[0],{vm:P0.m.vm});P0.ai=0}else fixVariant(P0.A,P0.m);P0.mc=true;phUI();phDraw();
+    toast(r.how==="ai"?"Đã xóa đúng các nét chữ, phần chữ đặc do AI vẽ lại":"Đã xóa đúng các nét chữ trong vùng tô")},
   phmaskx(){if(!PE||!PE.o)return;PE.mask.getContext("2d").clearRect(0,0,OW,OH);PE.masked=false;phDraw()},
   phundo(){if(!PE||!PE.undo)return;PE.o=PE.undo;PE.undo=null;PE.A=analyze(PE.o);fixVariant(PE.A,PE.m);phUI();phDraw()},
   phmain(){if(!PE||!PE.i)return;const a=ed.photos.splice(PE.i,1)[0];ed.photos.unshift(a);PE.i=0;phUI();drawPhotos();toast("Đã đặt làm ảnh chính")},
@@ -1048,12 +1005,12 @@ const ACT={
   impmore(){if(!IMP)return;IMP.lim+=60;updImp()},
   impgo(){impGo()},
   wmnew(d){wmOpen(!!d.e)},
-  wmclose(){WE=null;if(IMP){show("imp");updImp()}else closeAll()},
+  wmclose(){if(WE&&WE.busy)return toast("Đang xử lý, chờ một chút");WE=null;if(IMP){show("imp");updImp()}else closeAll()},
   wmauto(){wmAuto()},
-  wmtest(){if(!WE||WE.busy)return;if(!WE.rects.length)return toast("Khoanh vùng watermark trước");WE.test=!WE.test;wmUI();wmDraw()},
+  wmtest(){if(!WE||WE.busy)return;if(WE.test){WE.test=false;wmUI();wmDraw()}else wmTestView()},
   wmnext(){if(!WE||WE.busy||WE.files.length<2)return;WE.fi=(WE.fi+1)%WE.files.length;wmLoad()},
-  wmundo(){if(!WE||!WE.rects.length)return;WE.rects.pop();WE.view=null;wmUI();wmDraw()},
-  wmclr(){if(!WE)return;WE.rects=[];WE.view=null;WE.test=false;wmUI();wmDraw()},
+  wmmode(d){if(!WE||WE.busy)return;WE.mode=d.v;WE.test=false;wmUI();wmDraw()},
+  wmclr(){if(!WE||WE.busy)return;[WE.add,WE.cut].forEach(c=>c&&c.getContext("2d").clearRect(0,0,c.width,c.height));WE.painted=false;wmUI();wmDraw()},
   wmsave(){wmSave()},
   wmdel(d){const w=DB.wm[+d.i];if(!w)return;DB.wm.splice(+d.i,1);touch();drawAdmin();toast("Đã xóa mẫu "+w.name)},
   jobstop(){if(JOB&&!JOB.end){JOB.stop=true;jobUI();toast("Sẽ dừng sau các ảnh đang làm dở")}},
@@ -1083,56 +1040,112 @@ document.addEventListener("input",e=>{
   else if(t.id==="bsz"){$("#bszV").textContent=t.value}
   else if(t.id==="phSz"&&PE&&PE.o){PE.m.w=+t.value/100;clampM(PE.m);if(!PE.m.vm)fixVariant(PE.A,PE.m);PE.mc=true;reqDraw()}
 });
-/* ---------- mẫu xóa watermark theo nhà sỉ ---------- */
+/* ---------- mẫu xóa watermark theo nhà sỉ ----------
+   Trang so nhiều ảnh của cùng nhà sỉ để học CHÍNH XÁC từng điểm watermark (độ đục và màu), xem src/imgtools.js.
+   Kết quả tô đỏ lên ảnh (đậm nhạt theo độ đục). Chủ shop có thể tô chỗ bị sót hoặc chỗ nhận nhầm rồi tìm lại,
+   xem thử trước/sau ở cỡ phóng to, rồi lưu. Mẫu lưu thành một ảnh PNG trong kho ảnh, dữ liệu cửa hàng chỉ giữ đường dẫn. */
 const wmById=id=>DB.wm.find(w=>w.id===id);
+const wmDesc=w=>w.v===2?`học từ ${w.n||"nhiều"} ảnh`:`mẫu cũ, ${(w.r||[]).length} khung`;
 const wmPick=(fs,n)=>{if(fs.length<=n)return fs.slice();const o=[];for(let i=0;i<n;i++)o.push(fs[Math.floor(i*fs.length/n)]);return o};
 async function wmOpen(edit){
-  if(!IMP)return;if(!IMP.files.length)return toast("Chọn ảnh của nhà sỉ đó ở mục 1 trước");
-  const w=edit?wmById(IMP.wm):null;
-  WE={files:wmPick(IMP.files,16),fi:0,rects:w?w.r.map(r=>r.slice()):[],id:w?w.id:"",test:false,base:null,view:null,drag:null,msg:"",busy:false};
-  $("#wmName").value=w?w.name:"";show("wmed");$("#wmB").scrollTop=0;wmUI();await wmLoad();
-  if(WE&&!w&&WE.files.length>=3)wmAuto();
+  if(!IMP)return;const w=edit?wmById(IMP.wm):null;
+  if(!IMP.files.length&&!w)return toast("Chọn ảnh của nhà sỉ đó ở mục 1 trước");
+  WE={files:wmPick(IMP.files,40),fi:0,id:w?w.id:"",old:w&&!w.v,tpl:null,meta:null,n:0,test:false,base:null,view:null,mode:"view",add:null,cut:null,painted:false,msg:"",busy:false,prog:0,last:null,drag:false};
+  $("#wmName").value=w?w.name:"";show("wmed");$("#wmB").scrollTop=0;wmUI();
+  if(w&&w.v===2){try{WE.tpl=await wmTpl(w);WE.meta=w;WE.n=w.n||0;WE.msg=`Mẫu đã lưu, học từ ${w.n||"nhiều"} ảnh.`}catch(e){WE.msg="Chưa đọc được mẫu đã lưu."}}
+  else if(WE.old)WE.msg="Mẫu cũ dạng khung chữ nhật. Trang sẽ tìm lại chính xác từng nét từ các ảnh đã chọn.";
+  await wmLoad();
+  if(WE&&!WE.tpl&&WE.files.length)wmAuto();
 }
+/* ảnh xem trước (rộng 800) và hai lớp tô sửa cùng cỡ */
 async function wmLoad(){
-  const W0=WE;if(!W0)return;let b;try{b=await decode(W0.files[W0.fi])}catch(e){W0.msg="Không đọc được ảnh này.";return wmUI()}
+  const W0=WE;if(!W0)return;W0.view=null;W0.test=false;
+  if(!W0.files.length){W0.base=null;return wmUI()}
+  let b;try{b=await decode(W0.files[W0.fi])}catch(e){W0.msg="Không đọc được ảnh này.";return wmUI()}
   if(WE!==W0){if(b.close)b.close();return}
-  const iw=b.naturalWidth||b.width,ih=b.naturalHeight||b.height,cw=800,ch=Math.max(240,Math.min(1600,Math.round(cw*ih/iw))),c=cnv(cw,ch),x=c2d(c);
+  const iw=b.naturalWidth||b.width,ih=b.naturalHeight||b.height,cw=800,ch=Math.max(200,Math.min(2000,Math.round(cw*ih/iw))),c=cnv(cw,ch),x=c2d(c);
   x.imageSmoothingQuality="high";x.drawImage(b,0,0,cw,ch);if(b.close)b.close();
-  W0.base=c;W0.view=null;const C=$("#wmC");C.width=cw;C.height=ch;wmUI();wmDraw();
+  W0.base=c;W0.iw=iw;W0.ih=ih;
+  if(!W0.add||W0.add.width!==cw||W0.add.height!==ch){W0.add=cnv(cw,ch);W0.cut=cnv(cw,ch);W0.painted=false}
+  const C=$("#wmC");C.width=cw;C.height=ch;wmUI();wmDraw();
 }
 function wmDraw(){
   if(!WE||!WE.base)return;const C=$("#wmC"),x=C.getContext("2d"),W=C.width,H=C.height;
-  if(WE.test){if(!WE.view){const v=cnv(W,H);c2d(v).drawImage(WE.base,0,0);inpaintRects(v,WE.rects);WE.view=v}x.drawImage(WE.view,0,0);return}
-  x.drawImage(WE.base,0,0);x.lineWidth=3;
-  (WE.drag?WE.rects.concat([WE.drag.r]):WE.rects).forEach(r=>{x.fillStyle="rgba(217,74,74,.28)";x.strokeStyle="#d94a4a";x.fillRect(r[0]*W,r[1]*H,r[2]*W,r[3]*H);x.strokeRect(r[0]*W,r[1]*H,r[2]*W,r[3]*H)});
+  if(WE.test&&WE.view){C.width=WE.view.width;C.height=WE.view.height;C.getContext("2d").drawImage(WE.view,0,0);return}
+  if(C.width!==WE.base.width||C.height!==WE.base.height){C.width=WE.base.width;C.height=WE.base.height}
+  x.drawImage(WE.base,0,0);
+  if(WE.tpl&&window.FAIMG)FAIMG.overlayPreview(C,WE.tpl);
+  if(WE.painted){x.save();x.globalAlpha=.45;x.drawImage(WE.add,0,0);x.drawImage(WE.cut,0,0);x.restore()}
 }
 function wmUI(){
-  if(!WE)return;const n=WE.rects.length,big=WE.rects.some(r=>r[2]*r[3]>.12);
-  $("#wmS").textContent=WE.busy?`Đang so ${WE.files.length} ảnh để tìm watermark…`:(WE.msg?WE.msg+" ":"")+(n?`Đang có ${n} vùng sẽ xóa.`:"Chưa có vùng nào.")+(big?" Có vùng rất lớn: nếu watermark đè lên áo, phần áo ở đó sẽ mất chi tiết. Ảnh gốc không logo từ nhà sỉ vẫn đẹp nhất.":"");
-  $("#wmTest").textContent=WE.test?"Hiện lại vùng khoanh":"Xem thử sau khi xóa";
-  const nx=$("#wmNext");nx.hidden=WE.files.length<2;nx.textContent=`Ảnh khác (${WE.fi+1}/${WE.files.length})`;
+  if(!WE)return;const n=WE.files.length,bar=$("#wmBar");
+  bar.hidden=!WE.busy;bar.firstElementChild.style.width=Math.round((WE.prog||0)*100)+"%";
+  let s=WE.msg||"";
+  if(!WE.busy&&!WE.tpl&&!s)s=n?"Chưa có mẫu.":"Chọn ảnh của nhà sỉ ở mục 1 để trang tìm watermark.";
+  if(!WE.busy&&WE.tpl&&!WE.test)s+=(s?" ":"")+"Chỗ tô đỏ là watermark trang tìm được (đậm là đặc, nhạt là mờ). Bấm Ảnh khác để kiểm tra, Xem thử để so trước và sau.";
+  if(n&&n<10&&!WE.busy)s+=` Đang có ${n} ảnh. Từ 10 ảnh trở lên trang tìm chính xác hơn.`;
+  $("#wmS").textContent=s;
+  $("#wmTest").textContent=WE.test?"Quay lại xem chỗ tìm được":"Xem thử sau khi xóa";$("#wmTest").disabled=WE.busy||!WE.tpl||!n;
+  const nx=$("#wmNext");nx.hidden=n<2;nx.textContent=`Ảnh khác (${WE.fi+1}/${n})`;nx.disabled=WE.busy;
+  $$("#wmTools .o").forEach(b=>{b.setAttribute("aria-pressed",b.dataset.v===WE.mode);b.disabled=WE.busy||!n});
+  $("#wmRe").disabled=WE.busy||n<5;$("#wmRe").textContent=WE.painted?"Tìm lại theo chỗ đã tô":"Tìm lại";$("#wmClr").hidden=!WE.painted;
+  $("#wmC").style.cursor=WE.mode==="view"?"default":"crosshair";
 }
+/* hai lớp tô (cỡ ảnh xem trước) -> mặt nạ ở cỡ ảnh gốc mà trang học */
+function wmMask(c){if(!WE.painted)return null;const d=c2d(c).getImageData(0,0,c.width,c.height).data;let any=false;for(let i=3;i<d.length;i+=4)if(d[i]>40){any=true;break}return any?c:null}
 async function wmAuto(){
-  const W0=WE;if(!W0||W0.busy)return;W0.busy=true;W0.test=false;wmUI();wmDraw();
-  let r;try{r=await wmFind(W0.files)}catch(e){r={n:0,rects:[]}}
+  const W0=WE;if(!W0||W0.busy)return;
+  if(W0.files.length<5){W0.msg="Cần ít nhất 5 ảnh của cùng nhà sỉ (nên từ 10 ảnh) để trang tìm chính xác.";return wmUI()}
+  const F=await tools();if(!F){W0.msg="Chưa tải được công cụ tìm watermark. Kiểm tra mạng rồi thử lại.";return wmUI()}
+  W0.busy=true;W0.test=false;W0.prog=0;W0.msg="Đang so các ảnh để tìm watermark…";wmUI();wmDraw();
+  let r;try{r=await F.learnTemplate(W0.files,{addC:wmMask(W0.add),cutC:wmMask(W0.cut),onProgress:(t,p)=>{if(WE!==W0)return;W0.prog=p;W0.msg=t+"…";wmUI()}})}catch(e){r={ok:false,code:"err"}}
   if(WE!==W0)return;W0.busy=false;W0.view=null;
-  if(r.rects.length){W0.rects=r.rects;W0.msg=`Đã so ${r.n} ảnh và tìm thấy chỗ có dấu lặp lại. Xem thử, bấm Ảnh khác để kiểm tra thêm.`}
-  else W0.msg=r.n<3?"Cần ít nhất 3 ảnh cùng khổ của một nhà sỉ để tự tìm. Hãy kéo trên ảnh để khoanh.":`Đã so ${r.n} ảnh nhưng không thấy dấu nào lặp lại đúng một chỗ. Hãy kéo trên ảnh để khoanh.`;
+  if(r.ok){W0.tpl=r.tpl;W0.n=r.n;W0.meta=null;const px=r.tpl.a.reduce((s,a)=>s+(a>0),0);
+    W0.msg=`Đã so ${r.n} ảnh cùng khổ ${r.rw}×${r.rh}, tìm thấy watermark gồm ${px.toLocaleString("vi-VN")} điểm ảnh.`}
+  else W0.msg=r.code==="few"?`Cần ít nhất ${r.need||5} ảnh cùng khổ của một nhà sỉ, đang có ${r.n}.`:r.code==="none"?`Đã so ${r.n} ảnh nhưng không thấy dấu nào lặp lại đúng một chỗ. Có thể nhà sỉ đặt watermark mỗi ảnh một chỗ: hãy xóa tay từng ảnh trong khung Chỉnh ảnh.`:"Có lỗi khi tìm watermark, thử lại.";
   wmUI();wmDraw();
 }
-function wmSave(){
-  if(!WE||!IMP)return;if(!WE.rects.length)return toast("Khoanh ít nhất một vùng watermark");
-  const name=$("#wmName").value.trim().slice(0,40)||"Nhà sỉ "+(DB.wm.length+1),r=WE.rects.map(q=>q.slice());let w=WE.id&&wmById(WE.id);
-  if(w){w.name=name;w.r=r}else{if(DB.wm.length>=30)return toast("Tối đa 30 mẫu, hãy xóa bớt mẫu cũ");w={id:"w"+Date.now().toString(36),name,r};DB.wm.push(w)}
+/* xem thử: vùng watermark của ảnh đang xem ở cỡ thật, trên là trước, dưới là sau khi xóa */
+async function wmTestView(){
+  const W0=WE;if(!W0||!W0.tpl||W0.busy)return;const F=await tools();if(!F)return;
+  W0.busy=true;W0.msg="Đang xóa thử trên ảnh này…";wmUI();
+  try{const b=await decode(W0.files[W0.fi]),iw=b.naturalWidth||b.width,ih=b.naturalHeight||b.height,k=Math.min(1,3200/Math.max(iw,ih)),c=cnv(Math.round(iw*k),Math.round(ih*k));
+    c2d(c).drawImage(b,0,0,c.width,c.height);if(b.close)b.close();const before=cnv(c.width,c.height);before.getContext("2d").drawImage(c,0,0);
+    const T=W0.tpl,r=await F.applyTemplate(c,T);
+    const sx=c.width/T.rw,sy=c.height/T.rh,m=24,x0=Math.max(0,Math.floor(T.x*sx)-m),y0=Math.max(0,Math.floor(T.y*sy)-m),x1=Math.min(c.width,Math.ceil((T.x+T.w)*sx)+m),y1=Math.min(c.height,Math.ceil((T.y+T.h)*sy)+m);
+    const bw=x1-x0,bh=y1-y0,z=Math.min(800/bw,3),vw=Math.round(bw*z),vh=Math.round(bh*z),v=cnv(vw,vh*2+6),vx=v.getContext("2d");
+    vx.fillStyle="#c9a57a";vx.fillRect(0,0,vw,vh*2+6);vx.imageSmoothingQuality="high";vx.drawImage(before,x0,y0,bw,bh,0,0,vw,vh);vx.drawImage(c,x0,y0,bw,bh,0,vh+6,vw,vh);
+    if(WE!==W0)return;W0.view=v;W0.test=true;
+    W0.msg=r.found?`Trên: trước. Dưới: sau khi xóa${r.how==="ai"?" (phần watermark đặc do AI vẽ lại)":""}. Phóng to ${z.toFixed(1).replace(".",",")} lần.`:"Ảnh này không thấy watermark của mẫu, khi nhập hàng sẽ để nguyên ảnh.";
+  }catch(e){if(WE===W0)W0.msg="Chưa xóa thử được ảnh này."}
+  if(WE!==W0)return;W0.busy=false;wmUI();wmDraw();
+}
+async function wmSave(){
+  if(!WE||!IMP||WE.busy)return;if(!WE.tpl)return toast("Chưa có mẫu. Chờ trang tìm xong watermark");
+  const name=$("#wmName").value.trim().slice(0,40)||"Nhà sỉ "+(DB.wm.length+1);let w=WE.id&&wmById(WE.id);
+  if(!w&&DB.wm.length>=30)return toast("Tối đa 30 mẫu, hãy xóa bớt mẫu cũ");
+  let meta=WE.meta;
+  if(!meta){const F=await tools();if(!F)return toast("Chưa tải được công cụ, thử lại");WE.busy=true;WE.msg="Đang lưu mẫu…";wmUI();
+    try{const T=WE.tpl,blob=await new Promise((ok,no)=>F.tplToCanvas(T).toBlob(b=>b?ok(b):no({code:"encode"}),"image/png")),m=await putPng(blob);
+      meta={v:2,m,rw:T.rw,rh:T.rh,x:T.x,y:T.y,w:T.w,h:T.h,n:WE.n||0};WMT.set((w?w.id:"")+"|"+m,Promise.resolve(T))}
+    catch(e){WE.busy=false;WE.msg="Chưa lưu được mẫu: "+errText(e);return wmUI()}
+    WE.busy=false}
+  if(w){Object.keys(w).forEach(k=>{if(k!=="id")delete w[k]});Object.assign(w,{name},meta)}
+  else{w=Object.assign({id:"w"+Date.now().toString(36),name},meta);DB.wm.push(w)}
+  WMT.set(w.id+"|"+w.m,Promise.resolve(WE.tpl));
   IMP.wm=w.id;ls.set("fa_wm",w.id);WE=null;touch();show("imp");updImp();toast("Đã lưu mẫu "+name);
 }
-const wc=$("#wmC"),wpt=e=>{const r=wc.getBoundingClientRect();return[clamp((e.clientX-r.left)/r.width,0,1),clamp((e.clientY-r.top)/r.height,0,1)]};
-wc.addEventListener("pointerdown",e=>{if(!WE||!WE.base||WE.busy)return;e.preventDefault();try{wc.setPointerCapture(e.pointerId)}catch(_){}if(WE.test){WE.test=false;wmUI()}const p=wpt(e);WE.drag={p,r:[p[0],p[1],0,0]};wmDraw()});
-wc.addEventListener("pointermove",e=>{if(!WE||!WE.drag)return;const p=wpt(e),a=WE.drag.p;WE.drag.r=[Math.min(a[0],p[0]),Math.min(a[1],p[1]),Math.abs(p[0]-a[0]),Math.abs(p[1]-a[1])];wmDraw()});
-["pointerup","pointercancel"].forEach(t=>wc.addEventListener(t,()=>{if(!WE||!WE.drag)return;const r=WE.drag.r,p=WE.drag.p;WE.drag=null;
-  if(r[2]>.012&&r[3]>.008){if(WE.rects.length<12){WE.rects.push(r.map(v=>Math.round(v*1e4)/1e4));WE.msg=""}else toast("Tối đa 12 vùng")}
-  else{const i=WE.rects.findIndex(q=>p[0]>=q[0]&&p[0]<=q[0]+q[2]&&p[1]>=q[1]&&p[1]<=q[1]+q[3]);if(i>=0){WE.rects.splice(i,1);WE.msg=""}}
-  WE.view=null;wmUI();wmDraw()}));
+/* tô sửa trên ảnh xem trước: xanh = chỗ bị sót (trang tìm kỹ hơn ở đó), xanh dương = chỗ nhận nhầm (trang bỏ qua) */
+const wc=$("#wmC");
+function wmPaint(e,first){
+  const r=wc.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*WE.base.width,y=(e.clientY-r.top)/r.height*WE.base.height,c=WE.mode==="add"?WE.add:WE.cut,g=c.getContext("2d"),bw=Math.max(10,WE.base.width*.035);
+  g.strokeStyle=g.fillStyle=WE.mode==="add"?"#2fbf71":"#2f6fdf";g.lineCap="round";g.lineJoin="round";g.lineWidth=bw;
+  if(WE.last&&!first){g.beginPath();g.moveTo(WE.last[0],WE.last[1]);g.lineTo(x,y);g.stroke()}else{g.beginPath();g.arc(x,y,bw/2,0,Math.PI*2);g.fill()}
+  WE.last=[x,y];WE.painted=true;wmDraw();
+}
+wc.addEventListener("pointerdown",e=>{if(!WE||!WE.base||WE.busy||WE.mode==="view"||WE.test)return;e.preventDefault();try{wc.setPointerCapture(e.pointerId)}catch(_){}WE.drag=true;WE.last=null;wmPaint(e,true)});
+wc.addEventListener("pointermove",e=>{if(WE&&WE.drag)wmPaint(e,false)});
+["pointerup","pointercancel"].forEach(t=>wc.addEventListener(t,()=>{if(!WE||!WE.drag)return;WE.drag=false;WE.last=null;wmUI()}));
 const pv=$("#pvC");
 pv.addEventListener("pointerdown",e=>{if(!PE||!PE.o)return;e.preventDefault();try{pv.setPointerCapture(e.pointerId)}catch(_){}PE.drag=true;PE.last=null;phPoint(e,true)});
 pv.addEventListener("pointermove",e=>{if(PE&&PE.o&&PE.drag)phPoint(e,false)});

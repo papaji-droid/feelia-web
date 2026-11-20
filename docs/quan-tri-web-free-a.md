@@ -4,8 +4,9 @@ Tài liệu này dành cho mọi phiên Claude (chat, Cowork) làm việc với 
 
 ## 1. Trang nằm ở đâu
 
-- Trang bán hàng kiêm quản trị: https://claude.ai/artifact/CaoC55EGrg7Sv3QH2Dik4p (slug `5dcc892a-58c8-4fb3-9d40-e44d52a71631`), đang chia sẻ công khai cho mọi người có link.
-- Trang quản trị mở bằng đuôi `#quan-tri` trên chính trang bán hàng. Chỉ tài khoản có quyền sửa trang mới thấy và lưu được.
+- Trang bán hàng kiêm quản trị (từ 20/11/2026): https://free-a.onrender.com, chạy trên Render (máy chủ Node, dữ liệu trong Postgres). Mã nguồn: repo `papaji-droid/feelia-web`, xem README.
+- Trang quản trị sản phẩm mở bằng đuôi `#quan-tri`, trang quản lý đơn hàng ở `/admin`. Đăng nhập bằng mật khẩu quản trị (biến `ADMIN_PASSWORD` trên Render).
+- Bản cũ trên claude.ai (https://claude.ai/artifact/CaoC55EGrg7Sv3QH2Dik4p) không còn dùng; dữ liệu ban đầu đã được chép sang máy chủ mới.
 - Phòng thử đồ 3D: tạm ngưng theo yêu cầu chủ shop (14/11/2026). Đã gỡ link khỏi trang bán hàng. Không gắn lại khi chưa được yêu cầu.
 - Trang tự lưu phiên bản mới mỗi khi chủ shop bấm Lưu. Trước khi sửa mã trang, luôn đọc bản đang chạy và giữ nguyên khối `store` và `media` của bản đó (sản phẩm và ảnh chủ shop đã thêm).
 
@@ -25,12 +26,12 @@ Tài liệu này dành cho mọi phiên Claude (chat, Cowork) làm việc với 
 ## 3. Prompt công cụ gán logo lên ảnh sản phẩm
 
 > Mỗi ảnh sản phẩm thêm vào cửa hàng FREE.A phải tự động:
-> 1. Cắt khung 4:5 quanh người mẫu hoặc bộ đồ. Bỏ qua chữ in sẵn khi tìm bộ đồ.
+> 1. Cắt khung 4:5 giữ trọn người mẫu (cập nhật 20/11/2026, xem mục 4c): nhận diện người, không bao giờ cắt đầu; người toàn thân không vừa khung thì nới nền hai bên; ảnh không có người thì cắt quanh bộ đồ như cũ.
 > 2. Tìm chỗ đặt logo đẹp nhất: nền phẳng nhất, không che bộ đồ, mặt, tay chân, không đè lên chữ có sẵn, ở gần người mẫu, ưu tiên đường một phần ba và góc trên hoặc dưới.
 > 3. Chọn màu logo: giữ màu vàng đồng gốc nếu đủ tương phản với nền. Nếu không, dùng màu kem trên nền tối, nâu đậm trên nền sáng. Nền rối thì thêm bóng mờ.
 > 4. In đúng logo FREE.A (chữ FREE.A có chim, BY THUÝ AN, STYLING STUDIO). Cỡ mặc định 34% bề ngang ảnh. Có kiểu chỉ chữ FREE.A.
 > 5. Lưu bản gốc đã cắt và bản đã gán logo, để dời logo về sau không mất chất lượng.
-> 6. Xóa chữ thừa: người dùng tô lên chữ, trang lấp bằng nền xung quanh, có hoàn tác.
+> 6. Xóa chữ thừa: người dùng tô lên chữ, trang tự dò đúng nét chữ trong vùng tô (không xóa cả vùng), tính ngược ra màu gốc hoặc để AI vẽ lại đúng các nét đó, có hoàn tác.
 > 7. Có nút gán lại logo cho mọi ảnh khi đổi logo, kiểu hoặc cỡ.
 > 8. Tốc độ: phần xử lý dưới 0,1 giây mỗi ảnh. Thời gian còn lại là tải ảnh lên kho.
 > Watermark có sẵn chỉ được xóa theo mục 4b, với ảnh nhà sỉ đã cho phép dùng.
@@ -66,30 +67,46 @@ Quy tắc khác:
 
 Chủ shop xác nhận (15/11/2026): ảnh lấy từ các cửa hàng sỉ mà shop nhập hàng, đã được họ đồng ý cho dùng. Lưu ý đã báo chủ shop: được dùng ảnh chưa chắc là được xóa watermark, nên ưu tiên xin nhà sỉ bộ ảnh gốc không logo.
 
-### Prompt công cụ
+### Cách làm (viết lại 20/11/2026, mã ở `src/imgtools.js`)
 
-> Khi nhập hàng loạt ảnh của nhà sỉ, trang FREE.A phải xóa watermark có sẵn rồi mới gán logo FREE.A, hoàn toàn tự động cho cả nghìn ảnh:
-> 1. Mỗi nhà sỉ một "mẫu xóa": danh sách vùng chữ nhật theo tỉ lệ khung ảnh gốc, vì ảnh của cùng một nhà sỉ có watermark ở cùng một chỗ.
-> 2. Tạo mẫu: chọn ảnh của một nhà sỉ, bấm Tạo mẫu. Trang tự so tối đa 16 ảnh cùng khổ, tìm những nét lặp lại đúng một chỗ trên gần như mọi ảnh (watermark), khoanh sẵn các vùng đó. Người dùng xem thử, kéo để khoanh thêm, chạm để bỏ vùng sai, đặt tên rồi lưu.
-> 3. Áp mẫu: mỗi ảnh được thu về cạnh dài tối đa 1600 px, xóa các vùng trong mẫu, rồi mới cắt khung 4:5 và gán logo như cũ.
-> 4. Cách lấp: chép mảng nền sạch giống viền nhất ở ngay cạnh, hòa chênh lệch màu ở viền vào trong cho liền. Không tìm được mảng sạch thì nội suy mịn từ viền vào và rắc hạt nhẹ.
-> 5. Cảnh báo khi vùng quá lớn (watermark đè lên áo), vì phần áo ở đó sẽ mất chi tiết.
-> 6. Mẫu lưu cùng dữ liệu cửa hàng, tối đa 30 mẫu, mỗi mẫu tối đa 12 vùng. Xóa mẫu ở mục Cửa hàng.
-> Không làm: tự xóa watermark khi không có mẫu, xóa watermark trên ảnh không phải của nhà sỉ đã cho phép.
+Bản cũ khoanh khung chữ nhật rồi lấp cả khung, làm mất chi tiết áo và đôi khi chọn nhầm vùng. Bản mới:
+
+1. **Học mẫu từ nhiều ảnh của cùng nhà sỉ** (ít nhất 5, nên từ 10 ảnh, cùng khổ). Watermark là thứ duy nhất giống hệt nhau trên mọi ảnh, nên trang tính được độ đục (alpha) và màu của watermark **tại từng điểm ảnh**: so phần tần số cao của các ảnh để tìm chỗ có watermark, đoán nền bên dưới từ các điểm xung quanh, rồi hồi quy bền trên tất cả ảnh. Hai lượt: lượt đầu vùng rộng để tìm đủ cả bóng đổ, quầng sáng; lượt hai ôm sát nét để alpha không bị lệch.
+2. **Chống báo nhầm**: một điểm chỉ được coi là watermark khi có ý nghĩa thống kê (ít ảnh thì ngưỡng khắt khe hơn), nằm trong một cụm thành nét, và xuất hiện trên gần như **từng** ảnh (nét nền studio lặp lại ở vài ảnh sẽ bị loại).
+3. **Xóa**: chỗ watermark mờ được tính ngược phép trộn `ảnh = alpha*màu + (1-alpha)*gốc` để lấy lại đúng màu ảnh gốc (không vẽ đè). Chỗ watermark gần như đặc hoặc bị cháy sáng (không còn thông tin gốc), cùng viền 2 điểm quanh đó, do AI vẽ lại: mô hình MI-GAN (Picsart AI Research, giấy phép MIT, 28 MB) chạy ngay trong trình duyệt, tải một lần, có kiểm tra mã băm SHA-256. Không tải được AI thì dùng vá mảng PatchMatch.
+4. **Từng ảnh khi nhập**: trang tự dời mẫu tới ±2 điểm ảnh cho khớp, và kiểm tra ảnh có đúng watermark đó không (so giả thuyết có/không có watermark). Ảnh không có watermark của mẫu thì để nguyên.
+5. Mẫu lưu thành một ảnh PNG trong kho ảnh (nửa trái là màu, nửa phải là độ đục), dữ liệu cửa hàng chỉ giữ đường dẫn. Mẫu cũ dạng khung chữ nhật vẫn dùng được (trang dò nét chữ trong từng khung), nhưng nên bấm Sửa mẫu để học lại.
+
+Đo trên bộ thử 7 kiểu watermark × 14 ảnh (chữ trắng mờ, có bóng đổ, chữ đen + logo góc, chữ đặc viền đen, logo màu chuyển sắc, chữ lặp chéo kín ảnh, chữ quầng sáng), nén JPEG như Zalo, so với ảnh gốc sạch: vùng watermark đạt 23 đến 33 dB (cách cũ 12 đến 21 dB, nhiều bộ còn tệ hơn để nguyên), sát mức lý tưởng khi biết trước watermark thật (logo màu còn vượt, vì mẫu học từ ảnh thật bắt được cả hiệu ứng nén JPEG); số điểm bị sửa ngoài watermark trên cả 14 ảnh từ 0 đến khoảng 1.500 (cách cũ 300 nghìn đến 3,8 triệu điểm); không ảnh sạch nào bị xóa nhầm. Watermark lặp kín ảnh được nhận ra lưới lặp và lấp cả những đoạn khó thấy. Ảnh bị cắt khác khổ (vuông, cắt bớt) vẫn tự dò ra chỗ watermark.
 
 ### Giới hạn
 
-- Watermark phải nằm cố định một chỗ. Ảnh của nhà sỉ đặt watermark lung tung mỗi ảnh một kiểu thì phải tách nhóm hoặc xóa tay trong khung Chỉnh ảnh.
-- Watermark phủ chéo kín cả ảnh, hoặc đè lên giữa bộ đồ, không xóa sạch được: chỗ đó bị lấp mất chi tiết áo. Cần xin ảnh gốc.
-- Trên nền hoa văn rối, có thể còn thấy viền mảng chép nếu nhìn kỹ.
-- Khi nhập, chỉ chọn ảnh của đúng nhà sỉ ứng với mẫu đang chọn. Mẫu sai nhà sỉ sẽ xóa nhầm vào ảnh.
+- Watermark phải giống nhau giữa các ảnh (cùng chữ, cùng chỗ theo tỉ lệ khung). Nhà sỉ đặt watermark mỗi ảnh một chỗ thì xóa tay từng ảnh trong khung Chỉnh ảnh.
+- Phần watermark đặc phủ lên chi tiết phức tạp (mặt, hoa văn) do AI vẽ lại nên là phỏng đoán hợp lý, không phải ảnh gốc thật. Ảnh gốc không logo từ nhà sỉ vẫn đẹp nhất.
+- Chữ lặp chéo rất mờ trên nền sáng có thể sót vài đoạn (trên nền sáng gần như không thấy).
+- Ít ảnh (5 đến 9) thì kém chính xác hơn; từ 10 ảnh trở lên mới đạt chất lượng như số đo ở trên.
+- AI vẽ lại cần mạng lần đầu (tải mô hình 28 MB) và chậm hơn: ảnh có watermark đặc mất khoảng 3 đến 6 giây mỗi ảnh.
+- Khi nhập, chỉ chọn ảnh của đúng nhà sỉ ứng với mẫu đang chọn.
 
-## 5. Cấu trúc trang (một file duy nhất)
+## 4c. Cắt khung 4:5 giữ trọn người mẫu
 
-1. Đầu trang, khoảng dòng 13 trở đi: khối `<script type="application/json" id="store">`. Đây là toàn bộ dữ liệu cửa hàng.
-2. Giữa trang: CSS, khuôn giao diện.
-3. Cuối trang: khối `id="media"` chứa ảnh bìa và logo dạng base64 (rất dài), rồi mã chạy trang.
-4. Ảnh sản phẩm nằm trong kho ảnh của trang (giới hạn 5000 file và 1 GB), được gọi bằng `/_blob/<id>`.
+Bản cũ chọn khung theo độ nổi bật nên hay cắt mất đầu ở ảnh dọc cao. Bản mới (20/11/2026):
+
+1. Nhận diện người bằng MediaPipe (EfficientDet-Lite0 của Google, giấy phép Apache 2.0), chạy trong trình duyệt, khoảng 0,1 giây mỗi ảnh. Bỏ qua người nhỏ phía sau (khán giả), giữ những người đủ lớn.
+2. Không bao giờ cắt đầu: khung luôn chứa đỉnh đầu và chừa khoảng trống phía trên.
+3. Ảnh dọc cao hơn 4:5 mà người toàn thân không vừa: nới nền hai bên (tối đa 22% bề ngang). Nền nới thêm do AI vẽ tiếp rồi làm mờ dần như xóa phông; không có AI thì soi gương nền rồi làm mờ. Nới tối đa vẫn không đủ thì mới cắt bớt phía chân.
+4. Người nhỏ trong ảnh: phóng vào cho người chiếm khoảng 90% chiều cao, nhưng không phóng quá 1,25 lần.
+5. Không thấy người (ảnh trải phẳng quần áo, không có mạng): cắt theo độ nổi bật như cũ.
+
+## 5. Cấu trúc trang
+
+Máy chủ (`server/`) dựng trang mỗi lần có người mở, từ các phần trong `src/` và dữ liệu trong cơ sở dữ liệu:
+
+1. Khối `<script type="application/json" id="store">`: toàn bộ dữ liệu cửa hàng (bảng `meta` và `products`).
+2. CSS (`src/base.css`, `src/admin.css`), khuôn giao diện (`src/tpl.html`).
+3. Khối `id="media"` chứa ảnh bìa và logo dạng base64, rồi mã chạy trang (`src/app.js`).
+4. Ảnh sản phẩm và ảnh mẫu watermark nằm trong kho ảnh (bảng `assets`), gọi bằng `/_blob/<id>`.
+5. `src/imgtools.js` (xóa watermark, AI vẽ lại, nhận diện người): phục vụ ở `/imgtools.js`, chỉ trang quản trị tải khi cần.
 
 Khối `store` có dạng, mỗi mục một dòng:
 
@@ -97,7 +114,7 @@ Khối `store` có dạng, mỗi mục một dòng:
 {"v":1,"rev":2,
 "shop":{...},
 "brand":{"st":"f","sz":34},
-"wm":[{"id":"w1abc","name":"Xưởng ABC","r":[[0.55,0.9156,0.35,0.05]]}],
+"wm":[{"id":"w1abc","name":"Xưởng ABC","v":2,"m":"a:<id>","rw":1080,"rh":1440,"x":171,"y":824,"w":733,"h":316,"n":14}],
 "vouchers":[
 {"code":"FREEA10","pct":10,"max":50000},
 {"code":"FREESHIP","ship":1,"min":199000}
@@ -115,7 +132,7 @@ Khối `store` có dạng, mỗi mục một dòng:
 
 - `shop`: name, by, title (tên trên tab trình duyệt), desc, phone, zalo (https), hours, shipFee, freeShip, saleEnd (hết giờ này giá giảm tự tắt), tryon (để trống, phòng thử đồ đang tạm ngưng), bank, notice (dòng thông báo trên cùng), headline, intro.
 - `brand`: cài đặt logo trên ảnh. st là "f" (logo đầy đủ) hoặc "s" (chỉ chữ FREE.A). sz là cỡ logo theo % bề ngang ảnh, từ 18 đến 60.
-- `wm`: mẫu xóa watermark theo nhà sỉ. id, name (tên nhà sỉ), r là danh sách vùng [x, y, rộng, cao] tính theo tỉ lệ khung ảnh gốc (0 đến 1).
+- `wm`: mẫu xóa watermark theo nhà sỉ, tối đa 30. Kiểu mới (`v:2`): id, name, m (ảnh mẫu PNG trong kho: nửa trái màu watermark, nửa phải độ đục từng điểm), rw×rh (khổ ảnh gốc đã học), x, y, w, h (khung chứa watermark trên khổ đó), n (số ảnh đã học). Kiểu cũ: r là danh sách vùng [x, y, rộng, cao] theo tỉ lệ khung ảnh (0 đến 1). Agent không tự tạo hay sửa mẫu, chỉ tạo qua trang quản trị.
 - `vouchers`: code (chữ hoa và số), pct (% giảm) và max (giảm tối đa), hoặc ship:1 (miễn phí giao hàng); min là đơn tối thiểu.
 - `looks`: bộ phối sẵn. ids là mã sản phẩm, off là % giảm khi mua cả bộ. Bộ nào có sản phẩm bị ẩn hoặc xóa sẽ tự ẩn.
 - `products`: id (số, không trùng), sku (mã sản phẩm, không trùng, dùng khi nhập hàng loạt), name, cat, shape (kiểu hình minh họa khi chưa có ảnh), pat, price, sale (phải nhỏ hơn price), sizes, colors, mat, desc, tag, hidden:true (tạm ẩn), photos (tối đa 8 ảnh, ảnh đầu là ảnh chính). Mỗi ảnh: s là bản đã gán logo, o là bản gốc đã cắt (đã xóa watermark nếu có mẫu), m là vị trí logo (x, y, w theo tỉ lệ ảnh; v, vm màu logo; st kiểu; a=1 nếu vị trí tự động). Sản phẩm đứng trước hiện trước.
@@ -144,9 +161,9 @@ Khối `store` có dạng, mỗi mục một dòng:
 
 ## 9. Giới hạn hiện tại
 
-- Đơn hàng chưa tự về shop: khách đặt xong gửi nội dung đơn qua Zalo.
+- Đơn hàng lưu vào cơ sở dữ liệu, xem ở `/admin`; khách vẫn gửi nội dung đơn qua Zalo để shop xác nhận. Chưa có báo đơn mới qua email hay Zalo.
 - Chưa có thanh toán online, quản lý kho hàng, tên miền riêng.
 - Kho ảnh tối đa 5000 file. Mỗi ảnh sản phẩm dùng 2 file, nên chứa được khoảng 2500 ảnh. Sau khi gán lại logo hàng loạt, bản cũ thành ảnh thừa: dọn bằng nút trong mục Cửa hàng.
-- Xóa watermark chỉ áp dụng khi nhập hàng loạt. Ảnh đã nhập trước đó muốn xóa thì dùng khung Chỉnh ảnh, Tô để xóa chữ.
+- Xóa watermark theo mẫu chỉ áp dụng khi nhập hàng loạt. Ảnh đã nhập trước đó muốn xóa thì dùng khung Chỉnh ảnh, Tô để xóa chữ (một ảnh lẻ không có ảnh khác để so nên kém chính xác hơn xóa theo mẫu).
 - Logo đang dùng được dựng lại từ ảnh bìa (chữ FREE.A và chim lấy từ ảnh, hai dòng chữ nhỏ gõ lại bằng phông Montserrat). Khi có file logo gốc PNG nền trong suốt, thay ở mục Cửa hàng, Đổi logo.
 - 12 sản phẩm ban đầu là mẫu thử có hình minh họa, giá và bảng size do Claude đề xuất, chờ chủ shop thay bằng hàng thật.

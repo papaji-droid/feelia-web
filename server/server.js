@@ -77,8 +77,21 @@ app.set("trust proxy", 1);
 app.use((req, res, next) => { res.set("X-Content-Type-Options", "nosniff"); res.set("Referrer-Policy", "same-origin"); next(); });
 
 app.get("/healthz", ah(async (req, res) => res.json({ ok: true, db: db.KIND, ...(await db.counts()) })));
-app.get("/", ah(async (req, res) => { res.set("Cache-Control", "no-store").type("html").send(await renderPage()); }));
-app.get("/admin", (req, res) => res.set("Cache-Control", "no-store").sendFile(path.join(__dirname, "admin.html")));
+/* Trang được "cách ly nguồn gốc" (COOP + COEP credentialless) để công cụ AI xử lý ảnh chạy được nhiều luồng.
+   credentialless vẫn cho tải font, script từ CDN như bình thường (chỉ không gửi cookie sang trang khác). */
+const isolate = (res) => res.set({ "Cross-Origin-Opener-Policy": "same-origin", "Cross-Origin-Embedder-Policy": "credentialless" });
+app.get("/", ah(async (req, res) => { isolate(res).set("Cache-Control", "no-store").type("html").send(await renderPage()); }));
+app.get("/admin", (req, res) => isolate(res).set("Cache-Control", "no-store").sendFile(path.join(__dirname, "admin.html")));
+// Công cụ xử lý ảnh (xóa watermark, AI vẽ lại, nhận diện người): chỉ trang quản trị tải khi cần.
+app.get("/imgtools.js", (req, res) => res.set("Cache-Control", "no-cache").type("js").sendFile(path.join(SRC, "imgtools.js")));
+// Tùy chọn: tự lưu mô hình AI ở thư mục models/ của repo (không có thì trình duyệt tải từ CDN, đã kiểm tra mã băm).
+app.get("/models/:file", (req, res) => {
+  const f = String(req.params.file);
+  if (!/^[\w.-]+\.(onnx|tflite|task)$/.test(f)) return res.sendStatus(404);
+  const p = path.join(__dirname, "..", "models", f);
+  if (!fs.existsSync(p)) return res.sendStatus(404);
+  res.set("Cache-Control", "public, max-age=31536000, immutable").sendFile(p);
+});
 
 app.get("/_blob/:id", ah(async (req, res) => {
   if (!/^[A-Za-z0-9_-]{16,64}$/.test(req.params.id)) return res.sendStatus(404);
