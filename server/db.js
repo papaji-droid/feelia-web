@@ -5,6 +5,10 @@ const path = require("path");
 const crypto = require("crypto");
 
 const PG_URL = process.env.DATABASE_URL || "";
+if (!PG_URL && process.env.NODE_ENV === "production") {
+  console.error("Thieu bien moi truong DATABASE_URL (ket noi Postgres). Tren Render: dong bo lai Blueprint de tao database free-a-db, hoac dat DATABASE_URL = Internal Database URL cua database.");
+  process.exit(1);
+}
 const KIND = PG_URL ? "postgres" : "sqlite";
 let DESC = "";
 let conn; // { all, get, run, tx }
